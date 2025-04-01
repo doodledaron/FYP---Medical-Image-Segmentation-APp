@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SegmentationResult } from "../../types";
+import { SegmentationResult } from "../types";
 
 export function useFileProcessing() {
   const [file, setFile] = useState<File | null>(null);
@@ -12,7 +12,7 @@ export function useFileProcessing() {
     setLoading(true);
 
     try {
-      // Simulated processing time - replace with actual API call
+      // Simulated processing time - replace with actual API call in production
       await new Promise(resolve => setTimeout(resolve, 2000));
       setSegmentationResult({ success: true });
     } catch (error) {
@@ -23,5 +23,12 @@ export function useFileProcessing() {
     }
   };
 
-  return { file, loading, segmentationResult, show3D, setShow3D, handleFileSelect };
+  return { 
+    file, 
+    loading, 
+    segmentationResult, 
+    show3D, 
+    setShow3D, 
+    handleFileSelect 
+  };
 }

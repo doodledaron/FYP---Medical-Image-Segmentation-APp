@@ -1,9 +1,7 @@
+// src/components/common/FileUpload.tsx
 import React, { useState } from 'react';
 import { Upload, AlertCircle } from 'lucide-react';
-
-interface FileUploadProps {
-  onFileSelect: (file: File) => void;
-}
+import { FileUploadProps } from '../../types';
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -12,6 +10,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {

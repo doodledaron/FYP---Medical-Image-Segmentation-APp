@@ -1,24 +1,32 @@
+// src/App.tsx
 import { useState } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ViewManager } from "./components/ViewManager";
-import { useFileProcessing } from "./components/hooks/useFileProcessing";
-import { useQuizManagement } from "./components/hooks/useQuizManagement";
-import { useTutorialProgress } from "./components/hooks/useTutorialProgress";
-import { InteractiveSegmentationTutorial } from "./components/tutorials/InteractiveSegmentationTutorial";
+import { useFileProcessing } from "./hooks/useFileProcessing";
+import { useQuizManagement } from "./hooks/useQuizManagement";
+import { useTutorialProgress } from "./hooks/useTutorialProgress";
+import { InteractiveSegmentationTutorial } from "./components/learning/tutorials/SegmentationIntro";
 
-// Define the view type to match what Sidebar and ViewManager expect
+// Define the view type
 type ViewType = "dashboard" | "tutorials" | "bestPractices" | "progress";
 
 export default function App(): JSX.Element {
+  // State for the current view and tutorial visibility
   const [currentView, setCurrentView] = useState<ViewType>("dashboard");
   const [showTutorial, setShowTutorial] = useState<boolean>(true);
 
+  // Initialize custom hooks
   const fileProcessing = useFileProcessing();
   const quizManagement = useQuizManagement();
   const tutorialProgress = useTutorialProgress();
 
+  // Show onboarding tutorial for new users
   if (showTutorial) {
-    return <InteractiveSegmentationTutorial onComplete={() => setShowTutorial(false)} />;
+    return (
+      <InteractiveSegmentationTutorial 
+        onComplete={() => setShowTutorial(false)} 
+      />
+    );
   }
 
   return (
@@ -29,6 +37,7 @@ export default function App(): JSX.Element {
         progress={tutorialProgress.progress} 
         tutorialScoresLength={tutorialProgress.tutorialScores.length} 
       />
+      
       <div className="pl-64">
         <ViewManager 
           currentView={currentView} 

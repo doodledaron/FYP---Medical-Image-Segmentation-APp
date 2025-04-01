@@ -1,6 +1,8 @@
+// src/components/learning/tutorials/InteractiveSegmentationTutorial.tsx
 import React, { useState } from 'react';
-import { AlertCircle, ChevronLeft, ChevronRight, Play, FileImage, Box, Eye, Activity } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '../../common/ui/alert';
+import { introSteps } from '../../../data/introSteps';
 
 interface TutorialProps {
   onComplete: () => void;
@@ -10,50 +12,8 @@ export const InteractiveSegmentationTutorial: React.FC<TutorialProps> = ({ onCom
   const [currentStep, setCurrentStep] = useState(0);
   const [showHint, setShowHint] = useState(false);
 
-  const tutorialSteps = [
-    {
-      title: "Welcome to Medical Image Segmentation",
-      description: "Learn how to segment 3D medical images using our AI-powered platform.",
-      hint: "Click 'Next' to begin your journey into medical image analysis.",
-      action: "Start Tutorial",
-      icon: <Play className="w-12 h-12 text-blue-500" />
-    },
-    {
-      title: "Upload Your NIFTI Scan",
-      description: "First, you'll need to upload your medical scan in NIFTI format.",
-      hint: "Ensure your file is in .nii or .nii.gz format for compatibility.",
-      action: "Try Uploading",
-      demo: true,
-      icon: <FileImage className="w-12 h-12 text-green-500" />
-    },
-    {
-      title: "View in 3D",
-      description: "Explore your scan in three dimensions using our interactive viewer.",
-      hint: "Use mouse controls: Left click to rotate, right click to pan, scroll to zoom.",
-      action: "Practice Navigation",
-      demo: true,
-      icon: <Box className="w-12 h-12 text-purple-500" />
-    },
-    {
-      title: "AI Segmentation",
-      description: "Watch as our AI model automatically identifies and segments the tumor.",
-      hint: "The process typically takes 30-60 seconds depending on scan size.",
-      action: "Run Demo Segmentation",
-      demo: true,
-      icon: <Activity className="w-12 h-12 text-orange-500" />
-    },
-    {
-      title: "Review Results",
-      description: "Examine the segmentation results and confidence scores.",
-      hint: "Toggle between 2D and 3D views to thoroughly inspect the results.",
-      action: "Explore Results",
-      demo: true,
-      icon: <Eye className="w-12 h-12 text-teal-500" />
-    }
-  ];
-
   const handleNext = () => {
-    if (currentStep < tutorialSteps.length - 1) {
+    if (currentStep < introSteps.length - 1) {
       setCurrentStep(currentStep + 1);
       setShowHint(false);
     } else {
@@ -74,31 +34,31 @@ export const InteractiveSegmentationTutorial: React.FC<TutorialProps> = ({ onCom
       <div className="w-full bg-gray-200 h-2 rounded-full">
         <div 
           className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-          style={{ width: `${((currentStep + 1) / tutorialSteps.length) * 100}%` }}
+          style={{ width: `${((currentStep + 1) / introSteps.length) * 100}%` }}
         />
       </div>
 
       {/* Main Tutorial Content */}
       <div className="bg-white rounded-lg shadow-lg p-8 space-y-6">
         <div className="flex items-center space-x-4">
-          {tutorialSteps[currentStep].icon}
-          <h2 className="text-2xl font-bold text-blue-900">{tutorialSteps[currentStep].title}</h2>
+          {introSteps[currentStep].icon}
+          <h2 className="text-2xl font-bold text-blue-900">{introSteps[currentStep].title}</h2>
         </div>
 
-        <p className="text-lg text-blue-700">{tutorialSteps[currentStep].description}</p>
+        <p className="text-lg text-blue-700">{introSteps[currentStep].description}</p>
 
         {showHint && (
           <Alert className="mt-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Hint</AlertTitle>
             <AlertDescription>
-              {tutorialSteps[currentStep].hint}
+              {introSteps[currentStep].hint}
             </AlertDescription>
           </Alert>
         )}
 
         {/* Interactive Demo Area */}
-        {tutorialSteps[currentStep].demo && (
+        {introSteps[currentStep].demo && (
           <div className="border-2 border-dashed border-blue-200 rounded-lg p-8 text-center bg-blue-50">
             <p className="text-blue-600">Interactive demo area for step {currentStep + 1}</p>
           </div>
@@ -126,7 +86,7 @@ export const InteractiveSegmentationTutorial: React.FC<TutorialProps> = ({ onCom
             onClick={handleNext}
             className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
           >
-            {currentStep === tutorialSteps.length - 1 ? 'Start Using App' : tutorialSteps[currentStep].action}
+            {currentStep === introSteps.length - 1 ? 'Start Using App' : introSteps[currentStep].action}
             <ChevronRight className="w-5 h-5 ml-1" />
           </button>
         </div>

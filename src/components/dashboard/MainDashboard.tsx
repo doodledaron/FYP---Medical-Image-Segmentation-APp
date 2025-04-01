@@ -1,10 +1,11 @@
+// src/components/dashboard/MainDashboard.tsx
 import React from 'react';
 import { Brain, Eye, Loader2 } from 'lucide-react';
-import { FileUpload } from '../FileUpload';
-import { Viewer3D } from '../Viewer3D';
-// @ts-ignore
+import { FileUpload } from '../common/FileUpload';
+import { Viewer3D } from '../viewer/Viewer3D';
+// @ts-ignore - Add proper image declaration if needed
 import captureImg from '../../assets/Capture.png';
-// @ts-ignore
+// @ts-ignore - Add proper image declaration if needed
 import capture1Img from '../../assets/Capture 1.png';
 
 interface MainDashboardProps {
@@ -26,6 +27,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 }) => {
   return (
     <div className="max-w-4xl mx-auto py-12 px-8">
+      {/* Header */}
       <div className="text-center mb-12">
         <div className="flex items-center justify-center mb-6">
           <Brain className="h-12 w-12 text-blue-600" />
@@ -38,6 +40,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </p>
       </div>
 
+      {/* File Upload Section */}
       <div className="bg-white rounded-xl shadow-lg p-8 mb-8 border border-blue-100">
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-blue-900 mb-2">Upload Scan</h2>
@@ -46,6 +49,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         <FileUpload onFileSelect={handleFileSelect} />
       </div>
 
+      {/* Loading State */}
       {loading && (
         <div className="bg-white rounded-xl shadow-lg p-8 text-center">
           <Loader2 className="animate-spin h-12 w-12 mx-auto text-blue-500 mb-4" />
@@ -54,6 +58,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
       )}
 
+      {/* Results Section */}
       {segmentationResult && !loading && (
         <div className="bg-white rounded-xl shadow-lg p-8">
           <div className="flex justify-between items-center mb-6">

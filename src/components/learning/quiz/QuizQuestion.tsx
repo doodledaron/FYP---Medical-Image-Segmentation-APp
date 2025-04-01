@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckSquare, Type, ListChecks } from 'lucide-react';
-import { QuizQuestion as QuizQuestionType } from '../../types';
+import { QuizQuestion as QuizQuestionType } from '../../../types';
 
 interface QuizQuestionProps {
   question: QuizQuestionType;

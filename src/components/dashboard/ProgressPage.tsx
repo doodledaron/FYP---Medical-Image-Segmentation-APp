@@ -1,3 +1,4 @@
+// src/components/dashboard/ProgressPage.tsx
 import React from 'react';
 import { Progress } from '../../types';
 import { Award, BookOpen, Target } from 'lucide-react';

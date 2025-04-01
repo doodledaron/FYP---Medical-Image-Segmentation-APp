@@ -1,6 +1,7 @@
+// src/components/learning/quiz/QuizSummary.tsx
 import React from 'react';
 import { Trophy, BarChart, Lightbulb, BookOpen, Target, Brain } from 'lucide-react';
-import { QuizQuestion } from '../../types';
+import { QuizQuestion } from '../../../types';
 
 interface QuizSummaryProps {
   title: string;
@@ -23,13 +24,39 @@ export const QuizSummary: React.FC<QuizSummaryProps> = ({
   const correctAnswers = Object.entries(answers).filter(([questionId, answer]) => {
     const question = questions.find(q => q.id === questionId);
     if (!question) return false;
+    
     if (Array.isArray(question.correctAnswer) && Array.isArray(answer)) {
       return question.correctAnswer.length === answer.length &&
         question.correctAnswer.every(a => answer.includes(a));
     }
+    
     return !Array.isArray(question.correctAnswer) && !Array.isArray(answer) &&
       answer.toLowerCase() === question.correctAnswer.toLowerCase();
   }).length;
+
+  const getRecommendations = () => {
+    if (percentage >= 90) {
+      return {
+        icon: <Brain className="w-5 h-5 text-blue-600" />,
+        title: 'Advanced Topics',
+        content: 'Excellent work! You\'re ready to explore more advanced topics in medical image segmentation.'
+      };
+    } else if (percentage >= 70) {
+      return {
+        icon: <Target className="w-5 h-5 text-blue-600" />,
+        title: 'Practice More',
+        content: 'You\'re doing well! Try practicing with more complex cases to improve further.'
+      };
+    } else {
+      return {
+        icon: <BookOpen className="w-5 h-5 text-blue-600" />,
+        title: 'Review Materials',
+        content: 'Consider reviewing the tutorial content again, focusing on areas where you scored lower.'
+      };
+    }
+  };
+
+  const recommendation = getRecommendations();
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-8 animate-fade-in">
@@ -106,34 +133,12 @@ export const QuizSummary: React.FC<QuizSummaryProps> = ({
           <Lightbulb className="w-6 h-6 text-blue-600" />
           <h3 className="text-xl font-semibold text-blue-900">Learning Recommendations</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {percentage < 70 && (
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <BookOpen className="w-5 h-5 text-blue-600" />
-                <h4 className="font-semibold text-blue-900">Review Materials</h4>
-              </div>
-              <p className="text-blue-700 text-sm">Consider reviewing the tutorial content again, focusing on areas where you scored lower.</p>
-            </div>
-          )}
-          {percentage >= 70 && percentage < 90 && (
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <Target className="w-5 h-5 text-blue-600" />
-                <h4 className="font-semibold text-blue-900">Practice More</h4>
-              </div>
-              <p className="text-blue-700 text-sm">You're doing well! Try practicing with more complex cases to improve further.</p>
-            </div>
-          )}
-          {percentage >= 90 && (
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <Brain className="w-5 h-5 text-blue-600" />
-                <h4 className="font-semibold text-blue-900">Advanced Topics</h4>
-              </div>
-              <p className="text-blue-700 text-sm">Excellent work! You're ready to explore more advanced topics in medical image segmentation.</p>
-            </div>
-          )}
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            {recommendation.icon}
+            <h4 className="font-semibold text-blue-900">{recommendation.title}</h4>
+          </div>
+          <p className="text-blue-700 text-sm">{recommendation.content}</p>
         </div>
       </div>
 

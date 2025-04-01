@@ -1,16 +1,35 @@
+// src/components/ViewManager.tsx
 import { MainDashboard } from "./dashboard/MainDashboard";
-import { TutorialList } from "./tutorials/TutorialList";
-import { BestPractices } from "./tutorials/BestPractices";
+import { TutorialList } from "./learning/tutorials/TutorialList";
+import { BestPractices } from "./learning/tutorials/BestPractices";
 import { ProgressPage } from "./dashboard/ProgressPage";
-import { QuizSummary } from "./quiz/QuizSummary";
-import { TutorialQuiz } from "./quiz/TutorialQuiz";
+import { QuizComponent } from "./learning/quiz/QuizComponent";
 import { videoTutorials } from "../config/tutorials";
 
 interface ViewManagerProps {
   currentView: 'dashboard' | 'tutorials' | 'bestPractices' | 'progress';
-  fileProcessing: any;
-  quizManagement: any;
-  tutorialProgress: any;
+  fileProcessing: {
+    file: File | null;
+    loading: boolean;
+    segmentationResult: any;
+    show3D: boolean;
+    setShow3D: (show: boolean) => void;
+    handleFileSelect: (file: File) => void;
+  };
+  quizManagement: {
+    showQuiz: boolean;
+    setShowQuiz: (show: boolean) => void;
+    showQuizSummary: boolean;
+    selectedTutorial: string | null;
+    setSelectedTutorial: (id: string | null) => void;
+    quizResults: { score: number; totalPoints: number; answers: Record<string, string | string[]> } | null;
+    resetQuiz: () => void;
+    handleQuizComplete: (tutorialId: string, score: number, totalPoints: number, answers: Record<string, string | string[]>) => void;
+  };
+  tutorialProgress: {
+    tutorialScores: any[];
+    progress: any;
+  };
 }
 
 export function ViewManager({ 
@@ -19,38 +38,25 @@ export function ViewManager({
   quizManagement, 
   tutorialProgress 
 }: ViewManagerProps) {
-  const { showQuiz, showQuizSummary, selectedTutorial, quizResults, resetQuiz, handleQuizComplete } = quizManagement;
-  const { tutorialScores, progress } = tutorialProgress;
-  const { file, loading, segmentationResult, show3D, setShow3D, handleFileSelect } = fileProcessing;
+  const renderTutorialView = () => {
+    const { showQuiz, showQuizSummary, selectedTutorial, quizResults, resetQuiz, handleQuizComplete, setSelectedTutorial, setShowQuiz } = quizManagement;
+    const { tutorialScores } = tutorialProgress;
 
-  if (currentView === "tutorials") {
-    // Show quiz summary if available
-    if (showQuizSummary && quizResults && selectedTutorial) {
-      const tutorial = videoTutorials.find(t => t.id === selectedTutorial);
-      return tutorial ? (
-        <QuizSummary
-          title={tutorial.title}
-          questions={tutorial.quiz}
-          answers={quizResults.answers}
-          score={quizResults.score}
-          totalPoints={quizResults.totalPoints}
-          onComplete={resetQuiz}
-        />
-      ) : null;
-    }
-    
     // Show quiz if showQuiz is true or a tutorial is selected
     if (showQuiz || selectedTutorial) {
       const tutorial = videoTutorials.find(t => t.id === selectedTutorial || t.id === "general");
-      return tutorial ? (
-        <TutorialQuiz
+      
+      if (!tutorial) return null;
+      
+      return (
+        <QuizComponent
           tutorialId={tutorial.id}
           tutorialTitle={tutorial.title}
           questions={tutorial.quiz}
           onComplete={(score, totalPoints, answers) => 
             handleQuizComplete(tutorial.id, score, totalPoints, answers)}
         />
-      ) : null;
+      );
     }
 
     // Otherwise show the tutorial list
@@ -58,21 +64,33 @@ export function ViewManager({
       <TutorialList
         tutorials={videoTutorials}
         tutorialScores={tutorialScores}
-        onSelectTutorial={(id) => quizManagement.setSelectedTutorial(id)}
-        onStartQuiz={() => quizManagement.setShowQuiz(true)}
+        onSelectTutorial={(id) => setSelectedTutorial(id)}
+        onStartQuiz={() => setShowQuiz(true)}
       />
     );
+  };
+
+  // Render the appropriate view based on the currentView state
+  switch (currentView) {
+    case 'tutorials':
+      return renderTutorialView();
+      
+    case 'bestPractices':
+      return <BestPractices />;
+      
+    case 'progress':
+      return <ProgressPage progress={tutorialProgress.progress} />;
+      
+    default: // dashboard
+      return (
+        <MainDashboard 
+          file={fileProcessing.file} 
+          loading={fileProcessing.loading} 
+          segmentationResult={fileProcessing.segmentationResult} 
+          show3D={fileProcessing.show3D} 
+          setShow3D={fileProcessing.setShow3D} 
+          handleFileSelect={fileProcessing.handleFileSelect} 
+        />
+      );
   }
-
-  if (currentView === "bestPractices") return <BestPractices />;
-  if (currentView === "progress") return <ProgressPage progress={progress} />;
-
-  return <MainDashboard 
-    file={file} 
-    loading={loading} 
-    segmentationResult={segmentationResult} 
-    show3D={show3D} 
-    setShow3D={setShow3D} 
-    handleFileSelect={handleFileSelect} 
-  />;
 }

@@ -1,10 +1,8 @@
+// src/components/viewer/Viewer3D.tsx
 import React, { useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Html, PivotControls, GizmoHelper, GizmoViewport } from '@react-three/drei';
-
-interface Viewer3DProps {
-  segmentationData?: any;
-}
+import { Viewer3DProps } from '../../types';
 
 function Mesh() {
   const [hovered, setHovered] = useState(false);

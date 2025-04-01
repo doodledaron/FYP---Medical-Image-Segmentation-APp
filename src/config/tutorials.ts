@@ -1,3 +1,4 @@
+// src/config/tutorials.ts
 import { Tutorial } from '../types';
 
 export const videoTutorials: Tutorial[] = [
@@ -54,7 +55,7 @@ export const videoTutorials: Tutorial[] = [
   {
     id: 'tutorial2',
     title: 'Advanced Preprocessing Techniques',
-    thumbnail: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    thumbnail: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop',
     duration: '25:45',
     studyNotes: [
       'Preprocessing is crucial for improving segmentation accuracy',
@@ -90,14 +91,6 @@ export const videoTutorials: Tutorial[] = [
         correctAnswer: ['Visual inspection of normalized images', 'Histogram analysis', 'SNR calculation'],
         explanation: 'Quality control should include both visual and quantitative measures to ensure preprocessing effectiveness.',
         points: 20
-      },
-      {
-        id: 'pre3',
-        type: 'free-text',
-        question: 'Explain why intensity normalization is important for deep learning-based segmentation.',
-        correctAnswer: 'Intensity normalization ensures consistent input ranges across different scans, improving model training stability and generalization',
-        explanation: 'Normalized intensities help neural networks learn more effectively by standardizing the input data distribution.',
-        points: 25
       }
     ]
   },
@@ -140,29 +133,41 @@ export const videoTutorials: Tutorial[] = [
         correctAnswer: ['Preprocessing pipeline', 'Network architecture', 'Training scheme', 'Data augmentation'],
         explanation: 'nnUNet automatically configures all these components based on dataset properties and available computational resources.',
         points: 20
-      },
-      {
-        id: 'nn3',
-        type: 'free-text',
-        question: 'Explain how nnUNet handles different input image sizes and resolutions.',
-        correctAnswer: 'nnUNet analyzes the dataset properties to determine optimal patch sizes, stride lengths, and batch sizes while maintaining memory efficiency',
-        explanation: 'The framework automatically adapts its configuration based on image properties and available GPU memory.',
-        points: 25
-      },
-      {
-        id: 'nn4',
-        type: 'multiple-choice',
-        question: 'What type of cross-validation strategy does nnUNet use by default?',
-        options: [
-          '3-fold',
-          '5-fold',
-          '7-fold',
-          '10-fold'
-        ],
-        correctAnswer: '5-fold',
-        explanation: 'nnUNet uses 5-fold cross-validation by default to ensure robust model evaluation and ensemble creation.',
-        points: 15
       }
     ]
   }
 ];
+
+// General quiz for testing overall knowledge (not tied to a specific tutorial)
+export const generalQuiz = {
+  id: 'general',
+  title: 'Medical Image Segmentation Knowledge Check',
+  quiz: [
+    {
+      id: 'gen1',
+      type: 'multiple-choice',
+      question: 'What is the recommended slice thickness for CT scans in lung imaging?',
+      options: ['0.5-1.0mm', '1.0-1.5mm', '2.0-2.5mm', '3.0-3.5mm'],
+      correctAnswer: '1.0-1.5mm',
+      explanation: 'The recommended slice thickness for lung CT imaging is typically 1.0-1.5mm to balance resolution and scan time.',
+      points: 10
+    },
+    {
+      id: 'gen2',
+      type: 'multiple-select',
+      question: 'Which of the following are common evaluation metrics for segmentation? (Select all that apply)',
+      options: ['Dice coefficient', 'Jaccard index', 'Hausdorff distance', 'Pixel accuracy'],
+      correctAnswer: ['Dice coefficient', 'Jaccard index', 'Hausdorff distance', 'Pixel accuracy'],
+      explanation: 'All of these are commonly used metrics to evaluate the performance of medical image segmentation algorithms.',
+      points: 15
+    },
+    {
+      id: 'gen3',
+      type: 'free-text',
+      question: 'Explain the difference between semantic segmentation and instance segmentation.',
+      correctAnswer: 'Semantic segmentation classifies each pixel into a category, while instance segmentation identifies individual instances of objects',
+      explanation: 'Semantic segmentation assigns each pixel a class label, while instance segmentation also distinguishes between separate instances of the same class.',
+      points: 20
+    }
+  ]
+};
