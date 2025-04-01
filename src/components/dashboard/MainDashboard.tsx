@@ -3,10 +3,7 @@ import React from 'react';
 import { Brain, Eye, Loader2 } from 'lucide-react';
 import { FileUpload } from '../common/FileUpload';
 import { Viewer3D } from '../viewer/Viewer3D';
-// @ts-ignore - Add proper image declaration if needed
-import captureImg from '../../assets/Capture.png';
-// @ts-ignore - Add proper image declaration if needed
-import capture1Img from '../../assets/Capture 1.png';
+import NiftiViewer from '../viewer/NiftiViewer';
 
 interface MainDashboardProps {
   file: File | null;
@@ -26,7 +23,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   handleFileSelect
 }) => {
   return (
-    <div className="max-w-4xl mx-auto py-12 px-8">
+    <div className="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="text-center mb-12">
         <div className="flex items-center justify-center mb-6">
@@ -41,13 +38,40 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       </div>
 
       {/* File Upload Section */}
-      <div className="bg-white rounded-xl shadow-lg p-8 mb-8 border border-blue-100">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-blue-900 mb-2">Upload Scan</h2>
-          <p className="text-blue-600 text-sm">Upload a .nii.gz file to begin analysis</p>
+      {!file && (
+        <div className="bg-white rounded-xl shadow-lg p-8 mb-8 border border-blue-100">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-blue-900 mb-2">Upload Scan</h2>
+            <p className="text-blue-600 text-sm">Upload a .nii.gz or .nii file to begin analysis</p>
+          </div>
+          <FileUpload onFileSelect={handleFileSelect} />
         </div>
-        <FileUpload onFileSelect={handleFileSelect} />
-      </div>
+      )}
+
+      {/* File Info - Show if file is selected */}
+      {file && !loading && (
+        <div className="bg-white rounded-xl shadow-lg p-4 mb-8 border border-blue-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="bg-blue-100 p-2 rounded-lg mr-4">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-blue-900">{file.name}</p>
+                <p className="text-sm text-blue-600">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => handleFileSelect(null as any)} 
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Change File
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -59,8 +83,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       )}
 
       {/* Results Section */}
-      {segmentationResult && !loading && (
-        <div className="bg-white rounded-xl shadow-lg p-8">
+      {file && segmentationResult && !loading && (
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-semibold text-blue-900">Analysis Results</h2>
@@ -79,38 +103,57 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <Viewer3D segmentationData={segmentationResult} />
           ) : (
             <div className="space-y-6">
-              <div className="bg-blue-50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-blue-900 mb-4">2D Scan Analysis</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <img
-                      src={captureImg}
-                      alt="Lung scan visualization"
-                      className="rounded-lg shadow-md w-full"
-                    />
-                    <p className="text-center text-blue-600 mt-2">Axial View</p>
-                  </div>
-                  <div>
-                    <img
-                      src={capture1Img}
-                      alt="Lung scan visualization"
-                      className="rounded-lg shadow-md w-full"
-                    />
-                    <p className="text-center text-blue-600 mt-2">Sagittal View</p>
-                  </div>
-                </div>
-                <div className="mt-6 bg-white p-4 rounded-lg border border-blue-100">
-                  <h4 className="font-medium text-blue-900 mb-2">AI Analysis Summary</h4>
-                  <ul className="space-y-2 text-blue-700">
-                    <li>• Detected anomaly in upper right lobe</li>
-                    <li>• Size: approximately 2.3cm x 1.8cm</li>
-                    <li>• Confidence score: 94%</li>
-                    <li>• Recommended for clinical review</li>
-                  </ul>
-                </div>
+              {/* Enhanced 2D NIFTI Viewer with sliders */}
+              <NiftiViewer file={file} segmentationResult={segmentationResult} />
+              
+              {/* Analysis Summary */}
+              <div className="mt-6 bg-white p-4 rounded-lg border border-blue-100">
+                <h4 className="font-medium text-blue-900 mb-2">AI Analysis Summary</h4>
+                <ul className="space-y-2 text-blue-700">
+                  <li className="flex items-start">
+                    <span className="text-blue-500 mr-2">•</span>
+                    <span>Detected anomaly in upper right lobe</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-blue-500 mr-2">•</span>
+                    <span>Size: approximately 2.3cm x 1.8cm</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-blue-500 mr-2">•</span>
+                    <span>Confidence score: 94%</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-blue-500 mr-2">•</span>
+                    <span>Recommended for clinical review</span>
+                  </li>
+                </ul>
               </div>
             </div>
           )}
+        </div>
+      )}
+      
+      {/* Informational Section */}
+      {!file && !loading && (
+        <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+          <h3 className="text-lg font-medium text-blue-900 mb-3">About NIFTI Medical Image Analysis</h3>
+          <p className="text-blue-700 mb-4">
+            Our platform provides advanced visualization and AI-driven analysis for neuroimaging data in NIFTI format (.nii, .nii.gz).
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="bg-white p-4 rounded-lg shadow-sm">
+              <h4 className="font-medium text-blue-900 mb-2">Upload</h4>
+              <p className="text-blue-600">Upload your NIFTI-formatted medical images for analysis</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm">
+              <h4 className="font-medium text-blue-900 mb-2">Visualize</h4>
+              <p className="text-blue-600">Interactive 2D and 3D visualization with multiple views</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm">
+              <h4 className="font-medium text-blue-900 mb-2">Analyze</h4>
+              <p className="text-blue-600">AI-powered segmentation and analysis</p>
+            </div>
+          </div>
         </div>
       )}
     </div>

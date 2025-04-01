@@ -47,17 +47,17 @@ export function ViewManager({
 }: ViewManagerProps) {
   const renderTutorialView = () => {
     const { showQuiz, showQuizSummary, selectedTutorial, quizResults, resetQuiz, handleQuizComplete, setSelectedTutorial, setShowQuiz } = quizManagement;
-    const { tutorialScores } = tutorialProgress;
+    const { tutorialScores, addTutorialScore } = tutorialProgress;
 
     if (showQuiz || selectedTutorial) {
       let quizData;
-      
+
       if (selectedTutorial === "general") {
         quizData = generalQuiz;
       } else {
         quizData = videoTutorials.find(t => t.id === selectedTutorial);
       }
-      
+
       if (!quizData || !quizData.quiz || !Array.isArray(quizData.quiz)) {
         console.error("Quiz data not found or not in correct format", { selectedTutorial, quizData });
         return (
@@ -67,24 +67,27 @@ export function ViewManager({
           </div>
         );
       }
-      
+
       return (
         <QuizComponent
           tutorialId={quizData.id}
           tutorialTitle={quizData.title}
           questions={quizData.quiz}
           onComplete={(score, totalPoints, answers) => {
-            // First, handle the quiz completion in quizManagement
-            handleQuizComplete(quizData.id, score, totalPoints, answers);
-            
-            // Then, also add the score to tutorial progress
-            tutorialProgress.addTutorialScore({
+            // Create a complete score object
+            const scoreRecord = {
               tutorialId: quizData.id,
               score,
               totalPoints,
               completedAt: new Date().toISOString(),
               answers
-            });
+            };
+
+            // Update progress tracking
+            addTutorialScore(scoreRecord);
+
+            // Handle the quiz completion in quizManagement
+            handleQuizComplete(quizData.id, score, totalPoints, answers);
           }}
           onFinish={resetQuiz}
         />
@@ -99,7 +102,7 @@ export function ViewManager({
         onSelectTutorial={(id) => setSelectedTutorial(id)}
         onStartQuiz={() => {
           setShowQuiz(true);
-          setSelectedTutorial("general"); // Add this line to select the general quiz
+          setSelectedTutorial("general");
         }}
       />
     );

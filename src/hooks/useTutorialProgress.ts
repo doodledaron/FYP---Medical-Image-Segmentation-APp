@@ -1,15 +1,16 @@
-// src/hooks/useTutorialProgress.ts
 import { useState, useMemo, useEffect } from "react";
 import { TutorialScore, Progress } from "../types";
 import { loadProgress, saveProgress } from "../utils/progressStorage";
 
 export function useTutorialProgress() {
   // Load scores from localStorage on initialization
-  const [tutorialScores, setTutorialScores] = useState<TutorialScore[]>(loadProgress());
+  const [tutorialScores, setTutorialScores] = useState<TutorialScore[]>(() => loadProgress());
   
   // Save scores to localStorage whenever they change
   useEffect(() => {
-    saveProgress(tutorialScores);
+    if (tutorialScores.length > 0) {
+      saveProgress(tutorialScores);
+    }
   }, [tutorialScores]);
   
   // Calculate derived state from tutorialScores
@@ -24,22 +25,27 @@ export function useTutorialProgress() {
     };
   }, [tutorialScores]);
 
-  // Add a new score to the tutorial scores
+  // Add a new score to the tutorial scores with better validation
   const addTutorialScore = (score: TutorialScore) => {
+    if (!score || !score.tutorialId) {
+      console.error("Invalid score data", score);
+      return;
+    }
+    
     // Check if this tutorial was already completed
     const existingIndex = tutorialScores.findIndex(
       s => s.tutorialId === score.tutorialId
     );
     
     if (existingIndex >= 0) {
-      // Replace existing score
-      setTutorialScores(prev => [
-        ...prev.slice(0, existingIndex),
-        score,
-        ...prev.slice(existingIndex + 1)
-      ]);
+      // Replace existing score with new functional state update
+      setTutorialScores(prev => {
+        const updated = [...prev];
+        updated[existingIndex] = score;
+        return updated;
+      });
     } else {
-      // Add new score
+      // Add new score using functional state update
       setTutorialScores(prev => [...prev, score]);
     }
   };

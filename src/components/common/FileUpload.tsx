@@ -19,8 +19,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
   };
 
   const validateFile = (file: File): boolean => {
-    if (!file.name.endsWith('.nii.gz')) {
-      setError('Please upload a .nii.gz file');
+    if (!file.name.endsWith('.nii.gz') && !file.name.endsWith('.nii')) {
+      setError('Please upload a .nii.gz or .nii file');
       return false;
     }
     setError(null);

@@ -26,15 +26,15 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
   const [totalPoints, setTotalPoints] = useState(0);
 
   // If there are no questions, show an empty state
-if (!questions || questions.length === 0) {
-  return (
-    <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-      <ListChecks className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-      <h2 className="text-xl font-bold text-blue-900 mb-2">No Quiz Available</h2>
-      <p className="text-blue-600">This tutorial doesn't have any quiz questions yet.</p>
-    </div>
-  );
-}
+  if (!questions || questions.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+        <ListChecks className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-blue-900 mb-2">No Quiz Available</h2>
+        <p className="text-blue-600">This tutorial doesn't have any quiz questions yet.</p>
+      </div>
+    );
+  }
 
   const handleAnswer = (answer: string | string[]) => {
     setAnswers({ ...answers, [questions[currentQuestion].id]: answer });
@@ -72,7 +72,8 @@ if (!questions || questions.length === 0) {
       setScore(calculatedScore);
       setTotalPoints(calculatedTotalPoints);
       setShowSummary(true);
-      // Record the quiz completion but don't navigate away yet
+
+      // Call onComplete with calculated results to update progress
       onComplete(calculatedScore, calculatedTotalPoints, answers);
     }
   };
@@ -103,8 +104,8 @@ if (!questions || questions.length === 0) {
                 key={index}
                 onClick={() => handleAnswer(option)}
                 className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${currentAnswer === option
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-blue-100 hover:border-blue-300'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-blue-100 hover:border-blue-300'
                   }`}
               >
                 <span className="text-blue-900">{option}</span>
@@ -142,8 +143,8 @@ if (!questions || questions.length === 0) {
                     }
                   }}
                   className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${isSelected
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-blue-100 hover:border-blue-300'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-blue-100 hover:border-blue-300'
                     }`}
                 >
                   <div className="flex items-center gap-3">
