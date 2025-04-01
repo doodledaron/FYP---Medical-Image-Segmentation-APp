@@ -1,5 +1,11 @@
 // src/config/tutorials.ts
-import { Tutorial } from '../types';
+import { Tutorial, QuizQuestion } from '../types';
+
+interface GeneralQuiz {
+  id: string;
+  title: string;
+  quiz: QuizQuestion[];
+}
 
 export const videoTutorials: Tutorial[] = [
   {
@@ -139,13 +145,13 @@ export const videoTutorials: Tutorial[] = [
 ];
 
 // General quiz for testing overall knowledge (not tied to a specific tutorial)
-export const generalQuiz = {
+export const generalQuiz: GeneralQuiz = {
   id: 'general',
   title: 'Medical Image Segmentation Knowledge Check',
   quiz: [
     {
       id: 'gen1',
-      type: 'multiple-choice',
+      type: 'multiple-choice' as const,
       question: 'What is the recommended slice thickness for CT scans in lung imaging?',
       options: ['0.5-1.0mm', '1.0-1.5mm', '2.0-2.5mm', '3.0-3.5mm'],
       correctAnswer: '1.0-1.5mm',
@@ -154,7 +160,7 @@ export const generalQuiz = {
     },
     {
       id: 'gen2',
-      type: 'multiple-select',
+      type: 'multiple-select' as const,
       question: 'Which of the following are common evaluation metrics for segmentation? (Select all that apply)',
       options: ['Dice coefficient', 'Jaccard index', 'Hausdorff distance', 'Pixel accuracy'],
       correctAnswer: ['Dice coefficient', 'Jaccard index', 'Hausdorff distance', 'Pixel accuracy'],
@@ -163,7 +169,7 @@ export const generalQuiz = {
     },
     {
       id: 'gen3',
-      type: 'free-text',
+      type: 'free-text' as const,
       question: 'Explain the difference between semantic segmentation and instance segmentation.',
       correctAnswer: 'Semantic segmentation classifies each pixel into a category, while instance segmentation identifies individual instances of objects',
       explanation: 'Semantic segmentation assigns each pixel a class label, while instance segmentation also distinguishes between separate instances of the same class.',

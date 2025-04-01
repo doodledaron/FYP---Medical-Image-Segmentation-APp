@@ -6,7 +6,7 @@ import { ReactNode } from "react";
  */
 export interface QuizQuestion {
   id: string;
-  type: 'multiple-choice' | 'free-text' | 'multiple-select';
+  type: 'multiple-choice' | 'free-text' | 'multiple-select'; // Make sure this matches the values in your data
   question: string;
   options?: string[];
   correctAnswer: string | string[];
@@ -119,6 +119,7 @@ export interface QuizComponentProps {
   tutorialTitle: string;
   questions: QuizQuestion[];
   onComplete: (score: number, totalPoints: number, answers: Record<string, string | string[]>) => void;
+  onFinish: () => void; 
 }
 
 /**

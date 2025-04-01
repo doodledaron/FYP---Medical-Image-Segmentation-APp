@@ -9,6 +9,7 @@ interface QuizComponentProps {
   tutorialTitle: string;
   questions: QuizQuestionType[];
   onComplete: (score: number, totalPoints: number, answers: Record<string, string | string[]>) => void;
+  onFinish: () => void; // New prop for final navigation
 }
 
 export const QuizComponent: React.FC<QuizComponentProps> = ({
@@ -16,6 +17,7 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
   tutorialTitle,
   questions = [],
   onComplete,
+  onFinish,
 }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -24,15 +26,15 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
   const [totalPoints, setTotalPoints] = useState(0);
 
   // If there are no questions, show an empty state
-  if (!questions || questions.length === 0) {
-    return (
-      <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-        <ListChecks className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-blue-900 mb-2">No Quiz Available</h2>
-        <p className="text-blue-600">This tutorial doesn't have any quiz questions yet.</p>
-      </div>
-    );
-  }
+if (!questions || questions.length === 0) {
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+      <ListChecks className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+      <h2 className="text-xl font-bold text-blue-900 mb-2">No Quiz Available</h2>
+      <p className="text-blue-600">This tutorial doesn't have any quiz questions yet.</p>
+    </div>
+  );
+}
 
   const handleAnswer = (answer: string | string[]) => {
     setAnswers({ ...answers, [questions[currentQuestion].id]: answer });
@@ -41,11 +43,11 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
   const calculateScore = () => {
     let calculatedScore = 0;
     let calculatedTotalPoints = 0;
-    
+
     Object.entries(answers).forEach(([questionId, answer]) => {
       const question = questions.find(q => q.id === questionId);
       if (!question) return;
-      
+
       calculatedTotalPoints += question.points;
 
       if (Array.isArray(question.correctAnswer) && Array.isArray(answer)) {
@@ -58,7 +60,7 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
         }
       }
     });
-    
+
     return { score: calculatedScore, totalPoints: calculatedTotalPoints };
   };
 
@@ -70,6 +72,7 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
       setScore(calculatedScore);
       setTotalPoints(calculatedTotalPoints);
       setShowSummary(true);
+      // Record the quiz completion but don't navigate away yet
       onComplete(calculatedScore, calculatedTotalPoints, answers);
     }
   };
@@ -82,7 +85,7 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
         answers={answers}
         score={score}
         totalPoints={totalPoints}
-        onComplete={() => onComplete(score, totalPoints, answers)}
+        onComplete={onFinish} // Just pass the onFinish function directly
       />
     );
   }
@@ -99,11 +102,10 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
               <button
                 key={index}
                 onClick={() => handleAnswer(option)}
-                className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${
-                  currentAnswer === option
+                className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${currentAnswer === option
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-blue-100 hover:border-blue-300'
-                }`}
+                  }`}
               >
                 <span className="text-blue-900">{option}</span>
               </button>
@@ -139,16 +141,14 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
                       handleAnswer([...newAnswer, option]);
                     }
                   }}
-                  className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${
-                    isSelected
+                  className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${isSelected
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-blue-100 hover:border-blue-300'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 border-2 rounded ${
-                      isSelected ? 'border-blue-500 bg-blue-500' : 'border-blue-300'
-                    }`}>
+                    <div className={`w-5 h-5 border-2 rounded ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-blue-300'
+                      }`}>
                       {isSelected && <CheckSquare className="w-4 h-4 text-white" />}
                     </div>
                     <span className="text-blue-900">{option}</span>
@@ -173,7 +173,7 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
           {questions[currentQuestion]?.type === 'multiple-select' && <CheckSquare className="w-6 h-6 text-blue-600" />}
           <h2 className="text-2xl font-bold text-blue-900">{tutorialTitle} Quiz</h2>
         </div>
-        
+
         <div className="w-full bg-gray-200 h-2 rounded-full">
           <div
             className="bg-blue-600 h-2 rounded-full transition-all duration-300"

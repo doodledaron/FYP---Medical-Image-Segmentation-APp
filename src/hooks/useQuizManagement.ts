@@ -1,3 +1,5 @@
+
+// use quiz management hook
 import { useState } from "react";
 
 export function useQuizManagement() {
@@ -16,6 +18,7 @@ export function useQuizManagement() {
     totalPoints: number, 
     answers: Record<string, string | string[]>
   ) => {
+    // Just store the results, don't change the view yet
     setQuizResults({ score, totalPoints, answers });
     setShowQuizSummary(true);
   };

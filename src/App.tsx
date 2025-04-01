@@ -7,18 +7,18 @@ import { useQuizManagement } from "./hooks/useQuizManagement";
 import { useTutorialProgress } from "./hooks/useTutorialProgress";
 import { InteractiveSegmentationTutorial } from "./components/learning/tutorials/SegmentationIntro";
 
-// Define the view type
 type ViewType = "dashboard" | "tutorials" | "bestPractices" | "progress";
 
 export default function App(): JSX.Element {
-  // State for the current view and tutorial visibility
   const [currentView, setCurrentView] = useState<ViewType>("dashboard");
   const [showTutorial, setShowTutorial] = useState<boolean>(true);
 
-  // Initialize custom hooks
-  const fileProcessing = useFileProcessing();
-  const quizManagement = useQuizManagement();
+  // Get tutorial progress hooks
   const tutorialProgress = useTutorialProgress();
+  
+  // Get other hooks
+  const quizManagement = useQuizManagement();
+  const fileProcessing = useFileProcessing();
 
   // Show onboarding tutorial for new users
   if (showTutorial) {

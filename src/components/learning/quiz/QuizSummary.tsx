@@ -144,13 +144,13 @@ export const QuizSummary: React.FC<QuizSummaryProps> = ({
 
       {/* Action Buttons */}
       <div className="flex justify-center gap-4">
-        <button
-          onClick={onComplete}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Continue Learning
-        </button>
-      </div>
+      <button
+        onClick={onComplete}
+        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Continue Learning
+      </button>
+    </div>
     </div>
   );
 };

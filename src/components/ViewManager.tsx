@@ -4,7 +4,7 @@ import { TutorialList } from "./learning/tutorials/TutorialList";
 import { BestPractices } from "./learning/tutorials/BestPractices";
 import { ProgressPage } from "./dashboard/ProgressPage";
 import { QuizComponent } from "./learning/quiz/QuizComponent";
-import { videoTutorials } from "../config/tutorials";
+import { videoTutorials, generalQuiz } from "../config/tutorials";
 
 interface ViewManagerProps {
   currentView: 'dashboard' | 'tutorials' | 'bestPractices' | 'progress';
@@ -29,32 +29,64 @@ interface ViewManagerProps {
   tutorialProgress: {
     tutorialScores: any[];
     progress: any;
+    addTutorialScore: (score: {
+      tutorialId: string;
+      score: number;
+      totalPoints: number;
+      completedAt: string;
+      answers: Record<string, string | string[]>;
+    }) => void;
   };
 }
 
-export function ViewManager({ 
+export function ViewManager({
   currentView,
-  fileProcessing, 
-  quizManagement, 
-  tutorialProgress 
+  fileProcessing,
+  quizManagement,
+  tutorialProgress
 }: ViewManagerProps) {
   const renderTutorialView = () => {
     const { showQuiz, showQuizSummary, selectedTutorial, quizResults, resetQuiz, handleQuizComplete, setSelectedTutorial, setShowQuiz } = quizManagement;
     const { tutorialScores } = tutorialProgress;
 
-    // Show quiz if showQuiz is true or a tutorial is selected
     if (showQuiz || selectedTutorial) {
-      const tutorial = videoTutorials.find(t => t.id === selectedTutorial || t.id === "general");
+      let quizData;
       
-      if (!tutorial) return null;
+      if (selectedTutorial === "general") {
+        quizData = generalQuiz;
+      } else {
+        quizData = videoTutorials.find(t => t.id === selectedTutorial);
+      }
+      
+      if (!quizData || !quizData.quiz || !Array.isArray(quizData.quiz)) {
+        console.error("Quiz data not found or not in correct format", { selectedTutorial, quizData });
+        return (
+          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+            <h2 className="text-xl font-bold text-blue-900 mb-2">Quiz Not Available</h2>
+            <p className="text-blue-600">Sorry, we couldn't load the quiz at this time.</p>
+          </div>
+        );
+      }
       
       return (
         <QuizComponent
-          tutorialId={tutorial.id}
-          tutorialTitle={tutorial.title}
-          questions={tutorial.quiz}
-          onComplete={(score, totalPoints, answers) => 
-            handleQuizComplete(tutorial.id, score, totalPoints, answers)}
+          tutorialId={quizData.id}
+          tutorialTitle={quizData.title}
+          questions={quizData.quiz}
+          onComplete={(score, totalPoints, answers) => {
+            // First, handle the quiz completion in quizManagement
+            handleQuizComplete(quizData.id, score, totalPoints, answers);
+            
+            // Then, also add the score to tutorial progress
+            tutorialProgress.addTutorialScore({
+              tutorialId: quizData.id,
+              score,
+              totalPoints,
+              completedAt: new Date().toISOString(),
+              answers
+            });
+          }}
+          onFinish={resetQuiz}
         />
       );
     }
@@ -65,7 +97,10 @@ export function ViewManager({
         tutorials={videoTutorials}
         tutorialScores={tutorialScores}
         onSelectTutorial={(id) => setSelectedTutorial(id)}
-        onStartQuiz={() => setShowQuiz(true)}
+        onStartQuiz={() => {
+          setShowQuiz(true);
+          setSelectedTutorial("general"); // Add this line to select the general quiz
+        }}
       />
     );
   };
@@ -74,22 +109,22 @@ export function ViewManager({
   switch (currentView) {
     case 'tutorials':
       return renderTutorialView();
-      
+
     case 'bestPractices':
       return <BestPractices />;
-      
+
     case 'progress':
       return <ProgressPage progress={tutorialProgress.progress} />;
-      
+
     default: // dashboard
       return (
-        <MainDashboard 
-          file={fileProcessing.file} 
-          loading={fileProcessing.loading} 
-          segmentationResult={fileProcessing.segmentationResult} 
-          show3D={fileProcessing.show3D} 
-          setShow3D={fileProcessing.setShow3D} 
-          handleFileSelect={fileProcessing.handleFileSelect} 
+        <MainDashboard
+          file={fileProcessing.file}
+          loading={fileProcessing.loading}
+          segmentationResult={fileProcessing.segmentationResult}
+          show3D={fileProcessing.show3D}
+          setShow3D={fileProcessing.setShow3D}
+          handleFileSelect={fileProcessing.handleFileSelect}
         />
       );
   }
