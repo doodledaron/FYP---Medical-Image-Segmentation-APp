@@ -1,4 +1,4 @@
-// src/data/tutorialSteps.ts
+// src/data/introSteps.ts
 import { Play, FileImage, Box, Eye, Activity } from 'lucide-react';
 import { IntroStep } from '../types';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Video, ListChecks, Play, Award } from 'lucide-react';
-import { Tutorial, TutorialScore } from '../../types';
+import { Tutorial, TutorialScore } from '../../../types';
 
 interface TutorialListProps {
   tutorials: Tutorial[];

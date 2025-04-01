@@ -2,11 +2,14 @@
 import React, { useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Html, PivotControls, GizmoHelper, GizmoViewport } from '@react-three/drei';
+import { Mesh } from 'three';
 import { Viewer3DProps } from '../../types';
 
-function Mesh() {
+// Renamed to MeshObject to avoid naming conflict with the Mesh type from three
+function MeshObject() {
   const [hovered, setHovered] = useState(false);
-  const meshRef = useRef();
+  // Properly typed ref
+  const meshRef = useRef<Mesh>(null);
 
   return (
     <PivotControls>
@@ -46,12 +49,15 @@ function Mesh() {
 }
 
 export const Viewer3D: React.FC<Viewer3DProps> = ({ segmentationData }) => {
+  // You could potentially use segmentationData to customize the 3D visualization
+  // For example, changing colors, sizes, or displaying specific data points
+
   return (
     <div className="w-full h-[600px] bg-gradient-to-br from-blue-900 to-black rounded-lg relative overflow-hidden">
       <Canvas camera={{ position: [0, 0, 5] }}>
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} />
-        <Mesh />
+        <MeshObject />
         <OrbitControls makeDefault />
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport labelColor="white" axisHeadScale={1} />
