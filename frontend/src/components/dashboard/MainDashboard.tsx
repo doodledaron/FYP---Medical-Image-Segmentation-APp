@@ -4,6 +4,7 @@ import { Brain, Eye, Loader2 } from 'lucide-react';
 import { FileUpload } from '../common/FileUpload';
 import { Viewer3D } from '../viewer/Viewer3D';
 import NiftiViewer from '../viewer/NiftiViewer';
+import axios from 'axios';
 
 interface MainDashboardProps {
   file: File | null;
@@ -63,8 +64,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 <p className="text-sm text-blue-600">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
               </div>
             </div>
-            <button 
-              onClick={() => handleFileSelect(null as any)} 
+            <button
+              onClick={() => handleFileSelect(null as any)}
               className="text-sm text-blue-600 hover:text-blue-800"
             >
               Change File
@@ -105,26 +106,28 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <div className="space-y-6">
               {/* Enhanced 2D NIFTI Viewer with sliders */}
               <NiftiViewer file={file} segmentationResult={segmentationResult} />
-              
+
               {/* Analysis Summary */}
               <div className="mt-6 bg-white p-4 rounded-lg border border-blue-100">
                 <h4 className="font-medium text-blue-900 mb-2">AI Analysis Summary</h4>
                 <ul className="space-y-2 text-blue-700">
                   <li className="flex items-start">
                     <span className="text-blue-500 mr-2">•</span>
-                    <span>Detected anomaly in upper right lobe</span>
+                    <span>Lung Volume: {segmentationResult.metrics?.lungVolume || 'N/A'} cm³</span>
                   </li>
                   <li className="flex items-start">
                     <span className="text-blue-500 mr-2">•</span>
-                    <span>Size: approximately 2.3cm x 1.8cm</span>
+                    <span>Lesion Volume: {segmentationResult.metrics?.lesionVolume || 'N/A'} cm³</span>
                   </li>
                   <li className="flex items-start">
                     <span className="text-blue-500 mr-2">•</span>
-                    <span>Confidence score: 94%</span>
+                    <span>Lesion Count: {segmentationResult.metrics?.lesionCount || 'N/A'}</span>
                   </li>
                   <li className="flex items-start">
                     <span className="text-blue-500 mr-2">•</span>
-                    <span>Recommended for clinical review</span>
+                    <span>Confidence Score: {segmentationResult.metrics?.confidenceScore
+                      ? `${(segmentationResult.metrics.confidenceScore * 100).toFixed(0)}%`
+                      : 'N/A'}</span>
                   </li>
                 </ul>
               </div>
@@ -132,7 +135,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           )}
         </div>
       )}
-      
+
       {/* Informational Section */}
       {!file && !loading && (
         <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">

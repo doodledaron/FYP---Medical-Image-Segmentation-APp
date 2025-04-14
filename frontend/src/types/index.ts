@@ -54,10 +54,17 @@ export type ViewType = 'dashboard' | 'tutorials' | 'bestPractices' | 'progress';
 /**
  * Result of segmentation processing
  */
+// src/types.ts
 export interface SegmentationResult {
   success: boolean;
   error?: string;
-  // Add more segmentation-specific properties as needed
+  resultUrl?: string;
+  metrics?: {
+    lungVolume: number;
+    lesionVolume: number;
+    lesionCount: number;
+    confidenceScore: number;
+  };
 }
 
 /**
