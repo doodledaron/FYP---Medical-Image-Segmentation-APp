@@ -4,10 +4,7 @@ import nibabel as nib
 import numpy as np
 from django.conf import settings
 from pathlib import Path
-import logging
 import time
-
-logger = logging.getLogger(__name__)
 
 class NNUNetHandlerMock:
     """
@@ -22,7 +19,7 @@ class NNUNetHandlerMock:
         
         # Validate mock segmentation file exists
         if not os.path.exists(self.mock_segmentation_path):
-            logger.warning(f"Mock segmentation file {self.mock_segmentation_path} not found. Make sure to set it correctly.")
+            print(f"WARNING - Mock segmentation file {self.mock_segmentation_path} not found. Make sure to set it correctly.")
 
     def predict(self, input_file_path, timeout=300):
         """
@@ -35,32 +32,65 @@ class NNUNetHandlerMock:
             Path to the output segmentation file
         """
         try:
-            logger.info(f"Running mock nnUNet prediction for {input_file_path}")
+            print(f"INFO - Running mock nnUNet prediction for {input_file_path}")
             
             # Simulate some processing time for realism
             time.sleep(2)
             
-            # OPTION 1: Simply return the original mock file path
-            # This is the simplest approach and avoids any file corruption issues
-            logger.info(f"Mock segmentation completed: using original file {self.mock_segmentation_path}")
-            return self.mock_segmentation_path
-            
-            # OPTION 2 (commented out): If you need a unique file per request, uncomment this
-            # and comment out the return statement above
-            """
             # Create destination path for segmentation result
             dest_file = str(Path(settings.SEGMENTATION_RESULTS_PATH) / f"seg_{os.path.basename(input_file_path)}")
             
-            # Load and save the NIFTI file using nibabel to ensure integrity
+            # Method 1: Use nibabel to properly handle .nii.gz files
+            # This ensures the NIFTI file structure is preserved
+            print(f"INFO - Loading NIFTI file using nibabel: {self.mock_segmentation_path}")
             nifti_img = nib.load(self.mock_segmentation_path)
+            
+            # Save using nibabel - this correctly handles .nii.gz format
+            print(f"INFO - Saving NIFTI file to: {dest_file}")
             nib.save(nifti_img, dest_file)
             
-            logger.info(f"Mock segmentation completed: saved to {dest_file}")
+            # Ensure file permissions are set correctly
+            os.chmod(dest_file, 0o644)  # Read/write for owner, read for others
+            
+            # Add verification to ensure the file was saved correctly
+            file_size = os.path.getsize(dest_file)
+            print(f"INFO - Saved file size: {file_size} bytes")
+            
+            # Method 2: If the above fails, try direct binary copy
+            if not os.path.exists(dest_file) or file_size == 0:
+                print("WARNING - nibabel save may have failed, trying binary copy")
+                
+                with open(self.mock_segmentation_path, 'rb') as src_file:
+                    with open(dest_file, 'wb') as dst_file:
+                        # Read in chunks to handle large files efficiently
+                        chunk_size = 1024 * 1024  # 1MB chunks
+                        while True:
+                            chunk = src_file.read(chunk_size)
+                            if not chunk:
+                                break
+                            dst_file.write(chunk)
+                
+                # Re-verify file after binary copy
+                if os.path.exists(dest_file):
+                    file_size = os.path.getsize(dest_file)
+                    print(f"INFO - After binary copy: file size: {file_size} bytes")
+            
+            # Final verification - can we load the file with nibabel?
+            try:
+                test_load = nib.load(dest_file)
+                test_shape = test_load.shape
+                test_datatype = test_load.get_data_dtype()
+                print(f"INFO - Verification successful - NIFTI shape: {test_shape}, datatype: {test_datatype}")
+            except Exception as e:
+                print(f"ERROR - Final verification failed: {str(e)}")
+            
+            print(f"INFO - Mock segmentation completed: saved to {dest_file}")
             return dest_file
-            """
             
         except Exception as e:
-            logger.exception(f"Error in mock nnUNet prediction: {str(e)}")
+            print(f"ERROR - Error in mock nnUNet prediction: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
             raise RuntimeError(f"Error in mock nnUNet prediction: {str(e)}")
     
     def fallback_inference(self, input_file_path):
@@ -112,7 +142,9 @@ class NNUNetHandlerMock:
                 "confidence_score": confidence_score
             }
         except Exception as e:
-            logger.exception(f"Error calculating segmentation metrics: {str(e)}")
+            print(f"ERROR - Error calculating segmentation metrics: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
             return {
                 "lung_volume": None,
                 "lesion_volume": None,

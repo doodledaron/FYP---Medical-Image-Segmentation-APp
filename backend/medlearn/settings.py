@@ -15,8 +15,9 @@ NNUNET_BASE = os.path.join(BASE_DIR, 'models', 'nnunet')
 NNUNET_RAW = os.path.join(NNUNET_BASE, 'nnUNet_raw')
 NNUNET_PREPROCESSED = os.path.join(NNUNET_BASE, 'nnUNet_preprocessed')
 NNUNET_RESULTS = os.path.join(NNUNET_BASE, 'nnUNet_results')
-SEGMENTATION_RESULTS_PATH = os.path.join(BASE_DIR, 'static', 'segmentations')
-
+SEGMENTATION_RESULTS_PATH = os.path.join(BASE_DIR, 'media', 'segmentations')
+LOG_DIR = BASE_DIR / 'logs'
+os.makedirs(LOG_DIR, exist_ok=True)
 # Create directories if they don't exist
 os.makedirs(NNUNET_RAW, exist_ok=True)
 os.makedirs(NNUNET_PREPROCESSED, exist_ok=True)
@@ -121,7 +122,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),  # Save logs to the 'logs' directory
+            'filename': LOG_DIR / 'django.log',  # Save logs to the 'logs' directory
             'formatter': 'verbose',
         },
         'console': {
@@ -214,8 +215,6 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-# nnUNet model settings
-NNUNET_MODEL_PATH = os.environ.get('NNUNET_MODEL_PATH', BASE_DIR / 'models' / 'nnUNet')
 
 # File storage paths
 NIFTI_UPLOAD_PATH = BASE_DIR / 'media' / 'uploads'

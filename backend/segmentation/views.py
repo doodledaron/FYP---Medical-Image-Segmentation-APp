@@ -72,7 +72,8 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
         """
         try:
             task = self.get_object()
-            serializer = self.get_serializer(task)
+            # Add context={'request': request} to pass the request to the serializer
+            serializer = self.get_serializer(task, context={'request': request})
             return Response(serializer.data)
         except SegmentationTask.DoesNotExist:
             return Response(

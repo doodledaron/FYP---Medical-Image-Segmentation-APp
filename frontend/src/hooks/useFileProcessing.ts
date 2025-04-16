@@ -46,7 +46,7 @@ export function useFileProcessing() {
       // Poll for task completion with longer timeout
       let taskComplete = false;
       let attempts = 0;
-      const maxAttempts = 60; // Increased from 30 to 60 attempts
+      const maxAttempts = 120; // Increased from 30 to 60 attempts
       const pollingInterval = 3000; // Increased from 2 seconds to 3 seconds
 
       console.log("Starting to poll for task completion...");
