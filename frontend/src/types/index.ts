@@ -60,7 +60,6 @@ export interface SegmentationResult {
   error?: string;
   resultUrl?: string;
   metrics?: {
-    lungVolume: number;
     lesionVolume: number;
     lesionCount: number;
     confidenceScore: number;

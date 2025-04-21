@@ -13,7 +13,8 @@ def nifti_file_path(instance, filename):
 
 def segmentation_result_path(instance, filename):
     """Generate file path for segmentation results"""
-    return os.path.join('segmentations', f"{instance.id}_seg_{filename}")
+    # Always use a consistent filename format based only on the ID
+    return os.path.join('segmentations', f"seg_{instance.id}.nii.gz")
 
 class SegmentationTask(models.Model):
     """Model for tracking lung image segmentation tasks"""
@@ -30,13 +31,12 @@ class SegmentationTask(models.Model):
     file_name = models.CharField(max_length=255)
     nifti_file = models.FileField(upload_to=nifti_file_path)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued')
-    result_file = models.FileField(upload_to=segmentation_result_path, null=True, blank=True)
+    result_file = models.FileField(upload_to=segmentation_result_path, max_length=255, null=True, blank=True)
     error = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     # Lung-specific segmentation metadata
-    lung_volume = models.FloatField(null=True, blank=True, help_text="Total lung volume in cubic centimeters")
     lesion_volume = models.FloatField(null=True, blank=True, help_text="Total lesion volume in cubic centimeters")
     lesion_count = models.IntegerField(null=True, blank=True, help_text="Number of distinct lesions")
     confidence_score = models.FloatField(null=True, blank=True, help_text="Model confidence score (0-1)")

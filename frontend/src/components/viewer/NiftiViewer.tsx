@@ -25,6 +25,9 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
   const [view, setView] = useState(SLICE_TYPE.CORONAL);
   const [segmentationFile, setSegmentationFile] = useState<File | null>(null);
   const [loadingStatus, setLoadingStatus] = useState<string>("idle");
+  const [showSegmentation, setShowSegmentation] = useState(true);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [segUrl, setSegUrl] = useState<string | null>(null);
 
   // Load segmentation file from API when available
   useEffect(() => {
@@ -34,16 +37,28 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
           setLoadingStatus("loading-segmentation");
           console.log("Segmentation result data:", segmentationResult);
           console.log("Fetching segmentation from URL:", segmentationResult.resultUrl);
-          
+
+          // FIXED: Removed the strict NIFTI extension check that was causing problems
+          if (!segmentationResult.resultUrl.includes('.gz')) {
+            console.warn("Segmentation result URL might not be a compressed file:", segmentationResult.resultUrl);
+            // Continue anyway as it might still work
+          }
+
           const response = await axios.get(segmentationResult.resultUrl, {
             responseType: 'blob',
           });
 
-          console.log("Segmentation response:", response);
-          console.log("Response data type:", response.data.type);
-          console.log("Response size:", response.data.size);
+          if (!response.data || response.data.size === 0) {
+            console.error("Segmentation file fetch returned empty data.");
+            setLoadingStatus("segmentation-empty");
+            return;
+          }
 
-          // Create a File object from the blob
+          console.log("Segmentation file fetch response:", response);
+          console.log("Response content type:", response.headers['content-type']);
+          console.log("Blob size:", response.data.size, "bytes");
+
+          // Create a File object from the blob with correct MIME type
           const segFile = new File([response.data], 'segmentation.nii.gz', {
             type: 'application/gzip',
           });
@@ -55,6 +70,9 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
           console.error('Error fetching segmentation file:', error);
           setLoadingStatus("segmentation-error");
         }
+      } else {
+        console.warn("No segmentationResult.resultUrl provided:", segmentationResult);
+        setLoadingStatus("no-segmentation-url");
       }
     };
 
@@ -79,12 +97,48 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
     });
   };
 
+  // Create object URLs for files only once
+  useEffect(() => {
+    if (file) {
+      const createFileUrl = async () => {
+        let fileBlob = file;
+        if (!file.name.endsWith(".gz")) {
+          console.log("File not compressed, compressing...");
+          const compressedBlob = await compressNifti(file);
+          fileBlob = new File([compressedBlob], `${file.name}.gz`, {
+            type: "application/gzip",
+            lastModified: Date.now(),
+          });
+        }
+        const url = URL.createObjectURL(fileBlob);
+        setFileUrl(url);
+        console.log("File URL created for original file:", url);
+      };
+      createFileUrl();
+    }
+
+    if (segmentationFile) {
+      const url = URL.createObjectURL(segmentationFile);
+      setSegUrl(url);
+      console.log("Segmentation file URL created:", url);
+    }
+
+    // Cleanup URLs when component unmounts
+    return () => {
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+      }
+      if (segUrl) {
+        URL.revokeObjectURL(segUrl);
+      }
+    };
+  }, [file, segmentationFile]);
+
   // Load the NIFTI file into the viewer
   useEffect(() => {
     const loadNifti = async () => {
       console.log("Loading NIFTI file into viewer with view type:", view);
-      console.log("Original file:", file);
-      console.log("Segmentation file:", segmentationFile);
+      console.log("Show segmentation:", showSegmentation);
       setLoadingStatus("loading-viewer");
 
       const canvas = document.getElementById("niivue-canvas") as HTMLCanvasElement;
@@ -94,49 +148,40 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
         return;
       }
 
-      // Attach Niivue to the canvas
+      // Cleanup previous Niivue instance if it exists
+      if (niivueRef.current) {
+        niivueRef.current.closeDrawing();
+        niivueRef.current = null;
+      }
+
+      // Create new Niivue instance
       niivueRef.current = new Niivue();
       niivueRef.current.attachToCanvas(canvas);
       niivueRef.current.setSliceType(view);
 
-      // Original file is always the main display file
-      let fileBlob = file;
-      if (file && !file.name.endsWith(".gz")) {
-        console.log("File not compressed, compressing...");
-        const compressedBlob = await compressNifti(file);
-        fileBlob = new File([compressedBlob], `${file.name}.gz`, {
-          type: "application/gzip",
-          lastModified: Date.now(),
-        });
-      }
-
-      if (!fileBlob) {
-        console.error("No file to display!");
+      if (!fileUrl) {
+        console.error("No file URL available!");
         setLoadingStatus("no-file-error");
         return;
       }
 
-      const fileUrl = URL.createObjectURL(fileBlob);
-      console.log("File URL created for original file:", fileUrl);
-
       // Prepare volumes for the viewer
       let volumes: NiivueVolume[] = [];
-      
+
       // Always add the main volume (original file)
       volumes.push({
         url: fileUrl,
-        name: fileBlob.name,
+        name: file.name,
       });
 
-      // Add segmentation overlay if available
-      if (segmentationFile) {
-        const segUrl = URL.createObjectURL(segmentationFile);
-        console.log("Segmentation file URL created:", segUrl);
+      // Add segmentation overlay if available and visible
+      if (segUrl && showSegmentation) {
         volumes.push({
           url: segUrl,
           name: 'segmentation.nii.gz',
-          colormap: 'overlay',  // Use the overlay colormap for segmentation
-          opacity: 0.7,         // Set opacity for segmentation overlay
+          // Using 'red' colormap as requested
+          colormap: 'red',
+          opacity: 0.7,
           visible: true,
         });
       }
@@ -159,42 +204,32 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
     };
 
     // Only load if we have the original file
-    if (file) {
+    if (file && fileUrl) {
       loadNifti();
     }
+  }, [file, fileUrl, segUrl, view, showSegmentation]);
 
-    // Cleanup the Niivue instance and revoke object URLs on unmount
-    return () => {
-      if (niivueRef.current) {
-        niivueRef.current.closeDrawing();
-        niivueRef.current = null;
-      }
 
-      // Revoke object URLs to free up memory
-      if (file) {
-        URL.revokeObjectURL(URL.createObjectURL(file));
-      }
-      if (segmentationFile) {
-        URL.revokeObjectURL(URL.createObjectURL(segmentationFile));
-      }
-    };
-  }, [file, segmentationFile, view]);
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-4 border border-blue-100">
       <h2 className="text-lg font-semibold text-blue-900 mb-2">2D NIFTI Viewer</h2>
       <p className="text-gray-600 text-sm mb-2">Hint: Use mouse scroll to navigate slices</p>
-      
-      {/* Debug info */}
+
+      {/* Debug info with more detailed information */}
       <div className="mb-4 text-xs bg-blue-50 p-2 rounded">
         <p>Loading status: {loadingStatus}</p>
         <p>Original file: {file?.name}</p>
         <p>Segmentation file: {segmentationFile ? 'Loaded' : 'Not loaded'}</p>
+        <p>Segmentation visible: {showSegmentation ? 'Yes' : 'No'}</p>
         {segmentationResult?.resultUrl && (
           <p>Result URL: {segmentationResult.resultUrl}</p>
         )}
+        {loadingStatus === "segmentation-error" && (
+          <p className="text-red-600">Error loading segmentation overlay. Check console for details.</p>
+        )}
       </div>
-      
+
       <div className="flex space-x-4 mb-4">
         <button
           onClick={() => setView(SLICE_TYPE.AXIAL)}
@@ -215,13 +250,24 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
           Sagittal View
         </button>
       </div>
-      
+
       {segmentationFile && (
         <div className="bg-green-50 border border-green-100 p-2 rounded mb-4">
-          <p className="text-green-700 text-sm">✓ Segmentation overlay loaded successfully</p>
+          <p className="text-green-700 text-sm">
+            ✓ Segmentation overlay loaded successfully
+            {!showSegmentation && " (currently hidden)"}
+          </p>
         </div>
       )}
-      
+      <div className="flex items-center space-x-4 mb-4">
+        <button
+          onClick={() => setShowSegmentation(prev => !prev)}
+          className={`px-4 py-2 ${showSegmentation ? 'bg-indigo-600' : 'bg-gray-500'} text-white rounded-lg`}
+        >
+          {showSegmentation ? "Hide Segmentation" : "Show Segmentation"}
+        </button>
+      </div>
+
       <canvas
         id="niivue-canvas"
         width="800"

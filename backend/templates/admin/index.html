@@ -7,7 +7,7 @@
   <style>
     .dashboard-container {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 20px;
       margin-bottom: 20px;
     }
@@ -38,17 +38,12 @@
       color: #888;
       margin-top: 10px;
     }
-    .dashboard-charts {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
     .dashboard-chart {
       background-color: white;
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       padding: 20px;
+      margin-bottom: 20px;
     }
     .dashboard-chart-title {
       font-size: 18px;
@@ -56,16 +51,12 @@
       color: #333;
       margin-bottom: 15px;
     }
-    .dashboard-tables {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
     .dashboard-table {
       background-color: white;
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       padding: 20px;
+      margin-bottom: 20px;
     }
     .dashboard-table-title {
       font-size: 18px;
@@ -122,6 +113,45 @@
       color: #666;
       margin-bottom: 20px;
     }
+    
+    /* New styles for segmentation previews */
+    .preview-image {
+      max-width: 80px;
+      max-height: 80px;
+      border-radius: 4px;
+      border: 1px solid #eee;
+    }
+    .metrics-pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+      margin-right: 4px;
+    }
+    .lesion-pill {
+      background-color: #fee2e2;
+      color: #b91c1c;
+    }
+    .count-pill {
+      background-color: #e0e7ff;
+      color: #4338ca;
+    }
+    .confidence-pill {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+    .detail-link {
+      display: inline-block;
+      padding: 3px 8px;
+      background-color: #e0f2fe;
+      color: #0369a1;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 12px;
+    }
+    .detail-link:hover {
+      background-color: #bae6fd;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
@@ -134,12 +164,6 @@
 
 <!-- Statistics Cards -->
 <div class="dashboard-container">
-  <div class="dashboard-card">
-    <div class="dashboard-card-title">Total Users</div>
-    <div class="dashboard-card-value">{{ user_count }}</div>
-    <div class="dashboard-card-subtitle">+{{ new_users_count }} this week</div>
-  </div>
-  
   <div class="dashboard-card">
     <div class="dashboard-card-title">Segmentation Tasks</div>
     <div class="dashboard-card-value">{{ task_count }}</div>
@@ -154,114 +178,79 @@
 </div>
 
 <!-- Charts -->
-<div class="dashboard-charts">
-  <div class="dashboard-chart">
-    <div class="dashboard-chart-title">Segmentation Tasks by Status</div>
-    <canvas id="statusPieChart" height="200"></canvas>
-  </div>
-  
-  <div class="dashboard-chart">
-    <div class="dashboard-chart-title">Segmentation Tasks (Last 30 days)</div>
-    <canvas id="taskLineChart" height="200"></canvas>
-  </div>
+<div class="dashboard-chart">
+  <div class="dashboard-chart-title">Segmentation Tasks (Last 30 days)</div>
+  <canvas id="taskLineChart" height="200"></canvas>
 </div>
 
 <!-- Tables -->
-<div class="dashboard-tables">
-  <div class="dashboard-table">
-    <div class="dashboard-table-title">Latest Segmentation Tasks</div>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>File</th>
-          <th>Status</th>
-          <th>User</th>
-          <th>Date</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for task in latest_tasks %}
-        <tr>
-          <td>{{ task.file_name }}</td>
-          <td>
-            <span class="status-badge status-{{ task.status }}">
-              {{ task.status|title }}
-            </span>
-          </td>
-          <td>{{ task.user__username|default:"Anonymous" }}</td>
-          <td>{{ task.created_at|date:"M d, Y" }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="4" style="text-align: center; padding: 20px;">No tasks found</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  
-  <div class="dashboard-table">
-    <div class="dashboard-table-title">Top Users</div>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Username</th>
-          <th>Completed Tasks</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in top_users %}
-        <tr>
-          <td>{{ user.user__username|default:"Anonymous" }}</td>
-          <td>{{ user.count }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="2" style="text-align: center; padding: 20px;">No data available</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<div class="dashboard-table">
+  <div class="dashboard-table-title">Latest Segmentation Tasks</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Metrics</th>
+        <th>Preview</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in latest_tasks %}
+      <tr>
+        <td>{{ task.file_name }}</td>
+        <td>
+          <span class="status-badge status-{{ task.status }}">
+            {{ task.status|title }}
+          </span>
+        </td>
+        <td>{{ task.created_at|date:"M d, Y" }}</td>
+        <td>
+          {% if task.lesion_volume is not None %}
+            <span class="metrics-pill lesion-pill">{{ task.lesion_volume|floatformat:1 }} cc</span>
+          {% endif %}
+          
+          {% if task.lesion_count is not None %}
+            <span class="metrics-pill count-pill">{{ task.lesion_count }} lesion{{ task.lesion_count|pluralize }}</span>
+          {% endif %}
+          
+          {% if task.confidence_score is not None %}
+            <span class="metrics-pill confidence-pill">{{ task.confidence_score|floatformat:0 }}% conf</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if task.preview_image %}
+            <img src="data:image/png;base64,{{ task.preview_image }}" alt="Preview" class="preview-image">
+          {% else %}
+            <span class="text-gray-400">No preview</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{% url 'admin:segmentation_segmentationtask_change' task.id %}" class="detail-link">
+            View Details
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 20px;">No tasks found</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // Status Pie Chart
-    const statusCtx = document.getElementById('statusPieChart').getContext('2d');
 
-    // Fixed with comment indicators
-    const statusLabels =  /* {{ status_labels|safe }} */ []
-    const statusData = /* {{ status_data|safe }} */ [];
-    
-    new Chart(statusCtx, {
-      type: 'pie',
-      data: {
-        labels: statusLabels,
-        datasets: [{
-          data: statusData,
-          backgroundColor: [
-            'rgba(209, 213, 219, 0.8)',  // gray for queued
-            'rgba(96, 165, 250, 0.8)',   // blue for processing
-            'rgba(52, 211, 153, 0.8)',   // green for completed
-            'rgba(248, 113, 113, 0.8)',  // red for failed
-          ]
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'right',
-          }
-        }
-      }
-    });
-    
+    // const statusLabels =  /* {{ status_labels|safe }} */ []
+    // const statusData = /* {{ status_data|safe }} */ [];
     // Task Line Chart
     const taskCtx = document.getElementById('taskLineChart').getContext('2d');
     const timeLabels = /* {{ time_labels|safe }} */ [];
-    const timeData = /* {{ time_data|safe }} */ [];
+    const timeData =  /* {{ time_data|safe }}; */ [];
     
     new Chart(taskCtx, {
       type: 'line',

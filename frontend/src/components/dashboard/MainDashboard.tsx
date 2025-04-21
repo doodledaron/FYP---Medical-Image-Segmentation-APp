@@ -1,6 +1,6 @@
 // src/components/dashboard/MainDashboard.tsx
 import React from 'react';
-import { Brain, Eye, Loader2 } from 'lucide-react';
+import { Brain, Eye, Loader2, MousePointer2, Maximize, RotateCcw } from 'lucide-react';
 import { FileUpload } from '../common/FileUpload';
 import { Viewer3D } from '../viewer/Viewer3D';
 import NiftiViewer from '../viewer/NiftiViewer';
@@ -101,7 +101,51 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
 
           {show3D ? (
-            <Viewer3D segmentationData={segmentationResult} />
+            <>
+              {/* Controls Guide for 3D View */}
+              <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-100">
+                <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                  <MousePointer2 className="h-5 w-5 mr-2 text-blue-600" />
+                  Niivue 3D Navigation Controls
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                  <div className="bg-white p-3 rounded shadow-sm flex items-start">
+                    <div className="mt-1 mr-2 bg-blue-100 p-1 rounded">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-800">Rotate</p>
+                      <p className="text-blue-600">Left-click and drag to rotate the 3D view</p>
+                    </div>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm flex items-start">
+                    <div className="mt-1 mr-2 bg-blue-100 p-1 rounded">
+                      <Maximize className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-800">Zoom</p>
+                      <p className="text-blue-600">Right-click and drag vertically or use mouse wheel</p>
+                    </div>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm flex items-start">
+                    <div className="mt-1 mr-2 bg-blue-100 p-1 rounded">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-800">Pan</p>
+                      <p className="text-blue-600">Middle-click and drag to pan the view</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* 3D Viewer */}
+              <Viewer3D segmentationData={segmentationResult} />
+            </>
           ) : (
             <div className="space-y-6">
               {/* Enhanced 2D NIFTI Viewer with sliders */}
@@ -111,10 +155,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
               <div className="mt-6 bg-white p-4 rounded-lg border border-blue-100">
                 <h4 className="font-medium text-blue-900 mb-2">AI Analysis Summary</h4>
                 <ul className="space-y-2 text-blue-700">
-                  <li className="flex items-start">
-                    <span className="text-blue-500 mr-2">•</span>
-                    <span>Lung Volume: {segmentationResult.metrics?.lungVolume || 'N/A'} cm³</span>
-                  </li>
                   <li className="flex items-start">
                     <span className="text-blue-500 mr-2">•</span>
                     <span>Lesion Volume: {segmentationResult.metrics?.lesionVolume || 'N/A'} cm³</span>
