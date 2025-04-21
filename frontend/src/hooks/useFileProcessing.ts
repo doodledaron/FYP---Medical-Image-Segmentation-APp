@@ -66,19 +66,20 @@ export function useFileProcessing() {
           if (statusResponse.data.status === "completed") {
             taskComplete = true;
             
-            // Validate the result URL
-            const resultUrl = statusResponse.data.result_file;
+            // Log the complete response for debugging
+            console.log("Complete response data:", statusResponse.data);
+            
+            // Get the result URL - fixed to use the correct field name (result_file_url)
+            const resultUrl = statusResponse.data.result_file_url;
             console.log("Received result URL:", resultUrl);
             
-            // Check if URL is valid and points to a NIFTI file
-            const isValidNiftiUrl = resultUrl && 
-              (resultUrl.endsWith('.nii') || resultUrl.endsWith('.nii.gz')) &&
-              (resultUrl.startsWith('http://') || resultUrl.startsWith('https://') || resultUrl.startsWith('/media/'));
-            
-            if (!isValidNiftiUrl) {
-              console.warn("Warning: Result URL may not be a valid NIFTI file URL:", resultUrl);
+            // Don't validate file extension, as Django might have renamed it
+            // Just ensure it's a URL string
+            if (!resultUrl) {
+              console.warn("Warning: No result URL received from backend");
+              console.log("Available fields:", Object.keys(statusResponse.data));
             } else {
-              console.log("Result URL is a valid NIFTI file URL.");
+              console.log("Result URL received successfully");
             }
             
             // Create a result object with the data needed by your viewers
@@ -86,7 +87,6 @@ export function useFileProcessing() {
               success: true,
               resultUrl: resultUrl,
               metrics: {
-                lungVolume: statusResponse.data.lung_volume,
                 lesionVolume: statusResponse.data.lesion_volume,
                 lesionCount: statusResponse.data.lesion_count,
                 confidenceScore: statusResponse.data.confidence_score

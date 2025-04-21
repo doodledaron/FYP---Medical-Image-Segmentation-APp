@@ -25,12 +25,12 @@ class SegmentationTaskDetailSerializer(serializers.ModelSerializer):
         model = SegmentationTask
         fields = [
             'id', 'user', 'file_name', 'status', 'nifti_file_url', 'result_file_url',
-            'lung_volume', 'lesion_volume', 'lesion_count', 'confidence_score',
+             'lesion_volume', 'lesion_count', 'confidence_score',
             'error', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'user', 'status', 'nifti_file_url', 'result_file_url',
-            'lung_volume', 'lesion_volume', 'lesion_count', 'confidence_score',
+             'lesion_volume', 'lesion_count', 'confidence_score',
             'error', 'created_at', 'updated_at'
         ]
     

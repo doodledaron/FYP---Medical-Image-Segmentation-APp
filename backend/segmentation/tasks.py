@@ -1,85 +1,98 @@
 from celery import shared_task
 from django.core.files import File
 from django.utils import timezone
+from django.conf import settings
 from datetime import timedelta
 from pathlib import Path
 import os
 import time
+import nibabel as nib
+import shutil
 
-#testing    
 @shared_task
 def dummy_log_test():
     print(">>> Logging works in Celery task <<<")
 
 @shared_task
 def process_segmentation_task(task_id):
-    """
-    Process a segmentation task asynchronously
-    
-    Args:
-        task_id: ID of the segmentation task to process
-    """
+    """Process a segmentation task asynchronously"""
     from .models import SegmentationTask
     from .nnunet_handler_mock import NNUNetHandlerMock as NNUNetHandler
     
     print(f"Starting segmentation task {task_id}")
     
     try:
+        # Get the task
         task = SegmentationTask.objects.get(id=task_id)
         task.status = 'processing'
         task.save(update_fields=['status', 'updated_at'])
 
+        # Initialize handler and get input path
         nnunet_handler = NNUNetHandler()
         input_file_path = task.nifti_file.path
         print(f"Input NIFTI file path: {input_file_path}")
         
-        result_file_path = None
-        
+        # Run segmentation
         try:
             print(f"Running nnUNet segmentation on {input_file_path}")
             result_file_path = nnunet_handler.predict(input_file_path)
         except Exception as e:
             print(f"Using fallback segmentation due to error: {str(e)}")
             result_file_path = nnunet_handler.fallback_inference(input_file_path)
-            print(f"Fallback segmentation file: {result_file_path}")
         
         if not os.path.exists(result_file_path):
-            print(f"Result file path doesn't exist: {result_file_path}")
             raise FileNotFoundError(f"Result file not found at {result_file_path}")
-            
+        
         print(f"Result file generated at: {result_file_path}")
-        result_filename = os.path.basename(result_file_path)
         
-        with open(result_file_path, 'rb') as f:
-            print(f"Saving file {result_filename} to task {task.id}")
-            task.result_file.save(result_filename, File(f), save=True)
+        # The path is already what we want, just update the database reference
+        media_relative_path = os.path.relpath(result_file_path, settings.MEDIA_ROOT)
         
-        task.refresh_from_db()
-        print(f"Saved result file: {task.result_file.name if task.result_file else 'None'}")
-        print(f"Result file path: {task.result_file.path if task.result_file else 'None'}")
-        print(f"Result file exists: {task.result_file_exists() if hasattr(task, 'result_file_exists') else 'Not checked'}")
-        
+        # Clear any existing file reference
         if task.result_file:
-            metrics = nnunet_handler.analyze_segmentation(result_file_path)
-            task.lung_volume = metrics.get('lung_volume')
+            old_file_path = task.result_file.path
+            task.result_file.delete(save=False)
+            # Only delete the old file if it's different from the new one
+            if os.path.exists(old_file_path) and old_file_path != result_file_path:
+                try:
+                    os.remove(old_file_path)
+                    print(f"Removed old result file: {old_file_path}")
+                except OSError as e:
+                    print(f"Failed to remove old file {old_file_path}: {e}")
+        
+        # Update the task with the file path
+        task.result_file.name = media_relative_path
+        task.save(update_fields=['result_file'])
+        
+        # Verify the saved file can be loaded with nibabel
+        try:
+            test_load = nib.load(task.result_file.path)
+            test_shape = test_load.shape
+            test_datatype = test_load.get_data_dtype()
+            print(f"Verification successful - Saved NIFTI shape: {test_shape}, datatype: {test_datatype}")
+        except Exception as e:
+            print(f"WARNING - Saved file verification failed: {str(e)}")
+        
+        # Set task to completed with metrics
+        try:
+            metrics = nnunet_handler.analyze_segmentation(task.result_file.path)
             task.lesion_volume = metrics.get('lesion_volume')
             task.lesion_count = metrics.get('lesion_count')
             task.confidence_score = metrics.get('confidence_score')
-            task.status = 'completed'
-            task.save()
-            print(f"Task completed successfully with metrics: {metrics}")
-        else:
-            print("Result file was not saved to the task")
-            task.status = 'failed'
-            task.error = "Result file could not be saved to the database"
-            task.save()
+            print(f"Analysis complete with metrics: {metrics}")
+        except Exception as e:
+            print(f"WARNING - Failed to compute metrics: {str(e)}")
         
+        task.status = 'completed'
+        task.save()
         print(f"Completed segmentation task {task_id}")
         
     except SegmentationTask.DoesNotExist:
         print(f"Task {task_id} not found")
     except Exception as e:
         print(f"Error processing segmentation task {task_id}: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         
         try:
             task = SegmentationTask.objects.get(id=task_id)

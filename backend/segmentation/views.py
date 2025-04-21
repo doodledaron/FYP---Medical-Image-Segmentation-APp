@@ -9,6 +9,8 @@ from .models import SegmentationTask
 from .serializers import SegmentationTaskSerializer, SegmentationTaskDetailSerializer
 from .tasks import process_segmentation_task
 import logging
+from django.conf import settings
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +74,19 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
         """
         try:
             task = self.get_object()
+            # Validate result file URL
+            result_url = None
+            if task.result_file:
+                result_url = task.result_file.url
+                # Check file extension and existence
+                valid_ext = result_url.endswith('.nii') or result_url.endswith('.nii.gz')
+                file_path = os.path.join(settings.MEDIA_ROOT, task.result_file.name)
+                file_exists = os.path.exists(file_path)
+                if not (valid_ext and file_exists):
+                    return Response(
+                        {"error": "Result file is missing or not a valid NIFTI file", "result_file": result_url},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
             # Add context={'request': request} to pass the request to the serializer
             serializer = self.get_serializer(task, context={'request': request})
             return Response(serializer.data)
