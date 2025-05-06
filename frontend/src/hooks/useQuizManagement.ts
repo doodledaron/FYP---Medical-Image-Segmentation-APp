@@ -3,14 +3,14 @@ import { useEffect, useState } from 'react';
 import { Tutorial } from '../types'; // This should match your backend tutorial structure
 import { fetchTutorialDetail } from '../api/learning'; // <-- Corrected import name
 
-export function useQuizManagement(selectedTutorial: string | null) {
+export function useQuizManagement(initialSelectedTutorial: string | null) { // Renamed prop for clarity
   const [tutorial, setTutorial] = useState<Tutorial | null>(null);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
   
   const [showQuiz, setShowQuiz] = useState(false);
   const [showQuizSummary, setShowQuizSummary] = useState(false);
-  const [currentTutorial, setCurrentTutorial] = useState<string | null>(null);
+  const [currentTutorialId, setCurrentTutorialId] = useState<string | null>(initialSelectedTutorial); // Initialize with prop, and this will be the ID to fetch
   
   const [quizResults, setQuizResults] = useState<{
     score: number;
@@ -18,19 +18,22 @@ export function useQuizManagement(selectedTutorial: string | null) {
     answers: Record<string, string | string[]>;
   } | null>(null);
 
-  // 🔁 Fetch tutorial when selectedTutorial changes
+  // 🔁 Fetch tutorial when currentTutorialId changes
   useEffect(() => {
-    if (!selectedTutorial) return;
+    if (!currentTutorialId) {
+      setTutorial(null); // Clear tutorial data if no ID is selected
+      return;
+    }
 
     setLoading(true);
     setError(null);
     setTutorial(null); // reset old data first
 
-    fetchTutorialDetail(selectedTutorial) // <-- Corrected function call
+    fetchTutorialDetail(currentTutorialId) // Use the internal state currentTutorialId for fetching
       .then(setTutorial)
       .catch((err) => setError(err.message ?? 'Failed to load tutorial'))
       .finally(() => setLoading(false));
-  }, [selectedTutorial]);
+  }, [currentTutorialId]); // Depend on the internal state currentTutorialId
 
   // ✅ Handle quiz completion
   const handleQuizComplete = (
@@ -52,7 +55,7 @@ export function useQuizManagement(selectedTutorial: string | null) {
   const resetQuiz = () => {
     setShowQuiz(false);
     setShowQuizSummary(false);
-    setCurrentTutorial(null);
+    setCurrentTutorialId(null); // Reset the internal ID
     setQuizResults(null);
     setTutorial(null);
     setError(null);
@@ -62,8 +65,8 @@ export function useQuizManagement(selectedTutorial: string | null) {
     showQuiz,
     setShowQuiz,
     showQuizSummary,
-    selectedTutorial: currentTutorial, // or just currentTutorial if you want
-    setSelectedTutorial: setCurrentTutorial, // <-- add this line
+    selectedTutorial: currentTutorialId, // Expose the internal ID state
+    setSelectedTutorial: setCurrentTutorialId, // This setter now correctly triggers the useEffect
     quizResults,
     handleQuizComplete,
     resetQuiz,
