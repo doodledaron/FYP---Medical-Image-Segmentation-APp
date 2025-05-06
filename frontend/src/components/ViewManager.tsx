@@ -17,16 +17,12 @@ export function ViewManager({ currentView }: ViewManagerProps) {
   const fileProcessing = useFileProcessing();
   const quizManagement = useQuizManagement(null);
   const tutorialProgress = useTutorialProgress();
-  // Move useTutorialList hook call to the top level
   const { tutorials, loading: tutorialsLoading, error: tutorialsError } = useTutorialList();
 
   const renderTutorialView = () => {
-    // Remove the hook call from here
     const { showQuiz, selectedTutorial, resetQuiz, setSelectedTutorial, setShowQuiz } = quizManagement;
-    // Use progress data from the tutorialProgress hook
     const { progress, isLoading: progressLoading, error: progressError, submitQuizAnswers } = tutorialProgress;
 
-    // Access tutorials, tutorialsLoading, tutorialsError directly from the outer scope
     if (tutorialsLoading || progressLoading) {
       return <p className="text-center p-6 text-blue-600">Loading data...</p>;
     }
@@ -39,17 +35,41 @@ export function ViewManager({ currentView }: ViewManagerProps) {
       );
     }
 
-    // If a tutorial is selected, show the quiz
-    if (showQuiz && selectedTutorial && tutorials) {
-      const selectedTutorialData = tutorials.find(t => t.id === selectedTutorial);
+    if (showQuiz && selectedTutorial) { // selectedTutorial is the ID
+      const { tutorial: detailedTutorialData, loading: quizLoading, error: quizError } = quizManagement;
+
+      if (quizLoading) {
+        return <p className="text-center p-6 text-blue-600">Loading quiz content...</p>;
+      }
+
+      if (quizError) {
+        return (
+          <div className="text-center p-6 text-red-600">
+            <p>Failed to load quiz: {quizError}</p>
+          </div>
+        );
+      }
+
+      if (!detailedTutorialData) {
+        return <p className="text-center p-6 text-gray-600">Tutorial details not available for quiz.</p>;
+      }
 
       return (
         <QuizComponent
-          tutorialId={selectedTutorial}
-          tutorialTitle={selectedTutorialData?.title || ""}
-          questions={selectedTutorialData?.questions || []}
+          tutorialId={selectedTutorial} // This is the ID string
+          tutorialTitle={detailedTutorialData.title || ""}
+          questions={detailedTutorialData.questions || []} // Use questions from detailedTutorialData
           onComplete={(score, totalPoints, answers) => {
-            submitQuizAnswers(Number(selectedTutorial), answers);
+            // Ensure submitQuizAnswers can handle a string ID if necessary,
+            // or parse selectedTutorial to number if API strictly requires number.
+            // Currently, Tutorial.id is string, submitQuizAnswers expects number.
+            const tutorialIdAsNumber = parseInt(selectedTutorial, 10);
+            if (!isNaN(tutorialIdAsNumber)) {
+              submitQuizAnswers(tutorialIdAsNumber, answers);
+            } else {
+              console.error("Failed to parse tutorialId to number:", selectedTutorial);
+              // Optionally, handle this error more gracefully in the UI
+            }
           }}
           onFinish={() => {
             resetQuiz();
@@ -58,13 +78,12 @@ export function ViewManager({ currentView }: ViewManagerProps) {
       );
     }
 
-    // Show the tutorial list
     return (
       <TutorialList
         tutorials={tutorials || []}
         completedTutorialIds={(progress?.completed_tutorials || []).map(String)}
         onSelectTutorial={(id) => {
-          setSelectedTutorial(id);
+          setSelectedTutorial(id); // This triggers fetchTutorialDetail in useQuizManagement
           setShowQuiz(true);
         }}
       />

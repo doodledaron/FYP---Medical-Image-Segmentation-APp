@@ -4,7 +4,7 @@ import axiosInstance from '../api/axiosConfig'; // Corrected path
 
 // Define the structure of the progress data coming from the backend
 interface UserProgressData {
-  completed_tutorials: number[];
+  completed_tutorials: string[];
   total_points: number;
   completed_count: number;
   completed_by_topic: { [key: string]: number };

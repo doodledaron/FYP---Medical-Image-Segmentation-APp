@@ -41,7 +41,7 @@ export interface TutorialScore {
  * User's overall learning progress (aligned with backend data)
  */
 export interface UserProgress {
-  completed_tutorials: number[]; // Changed from string[] to number[]
+  completed_tutorials: string[]; // Changed from string[] to number[]
   total_points: number;
   completed_count: number;
   completed_by_topic: Record<string, number>;
