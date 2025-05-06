@@ -51,16 +51,16 @@ class NNUNetHandlerMock:
             mock_data = nifti_img.get_fdata()
             print(f"INFO - LABELS {np.unique(mock_data)}")
             
-            # Downsize the segmentation directly
-            print(f"INFO - Downsizing segmentation for faster loading")
-            downsized_img = self._downsize_segmentation(nifti_img)
+            # Downsize the segmentation directly (COMMENTED OUT)
+            # print(f"INFO - Downsizing segmentation for faster loading")
+            # downsized_img = self._downsize_segmentation(nifti_img)
             
             # Ensure destination directory exists
             os.makedirs(os.path.dirname(dest_file), exist_ok=True)
             
-            # Save the downsized image
-            print(f"INFO - Saving downsized NIFTI file to: {dest_file}")
-            nib.save(downsized_img, dest_file)
+            # Save the original image instead of the downsized one
+            print(f"INFO - Saving original NIFTI file to: {dest_file}")
+            nib.save(nifti_img, dest_file) # Use nifti_img here
             
             # Ensure file permissions are set correctly
             os.chmod(dest_file, 0o644)  # Read/write for owner, read for others

@@ -87,6 +87,8 @@ def process_segmentation_task(task_id):
         task.save()
         print(f"Completed segmentation task {task_id}")
         
+
+        
     except SegmentationTask.DoesNotExist:
         print(f"Task {task_id} not found")
     except Exception as e:
