@@ -41,3 +41,6 @@ coverage.xml
 # OS specific files
 .DS_Store
 Thumbs.db
+
+#large nifti files
+models/nnunet/input_dir/

@@ -50,29 +50,32 @@ export function useFileProcessing() {
       const pollingInterval = 3000; // Increased from 2 seconds to 3 seconds
 
       console.log("Starting to poll for task completion...");
-      
+
       while (!taskComplete && attempts < maxAttempts) {
         attempts++;
         await new Promise(resolve => setTimeout(resolve, pollingInterval));
-        
+
         try {
           // Check task status with timeout
           const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/status/`, {
             timeout: 10000 // 10 seconds timeout for status checks
           });
-          
+
           console.log(`Poll attempt ${attempts}:`, statusResponse.data);
-          
+
           if (statusResponse.data.status === "completed") {
             taskComplete = true;
-            
+
             // Log the complete response for debugging
             console.log("Complete response data:", statusResponse.data);
-            
+
+            // *** ADD THIS LINE TO PRINT THE ORIGINAL NIFTI FILE URL ***
+            console.log("Received original nifti_file URL from backend:", statusResponse.data.nifti_file_url);
+
             // Get the result URL - fixed to use the correct field name (result_file_url)
             const resultUrl = statusResponse.data.result_file_url;
             console.log("Received result URL:", resultUrl);
-            
+        
             // Don't validate file extension, as Django might have renamed it
             // Just ensure it's a URL string
             if (!resultUrl) {
@@ -85,6 +88,8 @@ export function useFileProcessing() {
             // Create a result object with the data needed by your viewers
             setSegmentationResult({
               success: true,
+              originalFileUrl: statusResponse.data.nifti_file_url, // <-- Add this line
+              previewUrl:      statusResponse.data.preview_url,     // low‑res you’ll use by default
               resultUrl: resultUrl,
               metrics: {
                 lesionVolume: statusResponse.data.lesion_volume,
@@ -92,7 +97,7 @@ export function useFileProcessing() {
                 confidenceScore: statusResponse.data.confidence_score
               }
             });
-            
+
             console.log("Task completed successfully!");
           } else if (statusResponse.data.status === "failed") {
             throw new Error(statusResponse.data.error || "Processing failed");
@@ -130,7 +135,14 @@ export function useFileProcessing() {
       
       setSegmentationResult({ 
         success: false, 
-        error: errorMessage
+        error: errorMessage,
+        originalFileUrl: '',
+        resultUrl: '',
+        metrics: {
+          lesionVolume: 0,
+          lesionCount: 0,
+          confidenceScore: 0
+        }
       });
     } finally {
       setLoading(false);

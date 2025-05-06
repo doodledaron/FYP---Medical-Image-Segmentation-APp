@@ -26,7 +26,7 @@ urlpatterns = [
     # API endpoints
     path('api/', include('api.urls')),
     path('api/segmentation/', include('segmentation.urls')),
-    # path('api/learning/', include('learning.urls')),
+    path('api/learning/', include('learning.urls')),
     
     # API documentation
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

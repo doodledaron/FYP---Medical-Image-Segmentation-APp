@@ -1,125 +1,84 @@
-// src/components/ViewManager.tsx
-import { MainDashboard } from "./dashboard/MainDashboard";
-import { TutorialList } from "./learning/tutorials/TutorialList";
-import { BestPractices } from "./learning/tutorials/BestPractices";
-import { ProgressPage } from "./dashboard/ProgressPage";
-import { QuizComponent } from "./learning/quiz/QuizComponent";
-import { videoTutorials, generalQuiz } from "../config/tutorials";
+import React from 'react';
+import { useTutorialProgress } from '../hooks/useTutorialProgress';
+import { QuizComponent } from './learning/quiz/QuizComponent';
+import TutorialList from './learning/TutorialList';
+import ProgressPage from './dashboard/ProgressPage.tsx';
+import { MainDashboard } from './dashboard/MainDashboard';
+import { useQuizManagement } from '../hooks/useQuizManagement';
+import { useFileProcessing } from '../hooks/useFileProcessing';
+import { useTutorialList } from '../hooks/useTutorialList';
 
+// Props might need adjustment based on hook returns
 interface ViewManagerProps {
-  currentView: 'dashboard' | 'tutorials' | 'bestPractices' | 'progress';
-  fileProcessing: {
-    file: File | null;
-    loading: boolean;
-    segmentationResult: any;
-    show3D: boolean;
-    setShow3D: (show: boolean) => void;
-    handleFileSelect: (file: File) => void;
-  };
-  quizManagement: {
-    showQuiz: boolean;
-    setShowQuiz: (show: boolean) => void;
-    showQuizSummary: boolean;
-    selectedTutorial: string | null;
-    setSelectedTutorial: (id: string | null) => void;
-    quizResults: { score: number; totalPoints: number; answers: Record<string, string | string[]> } | null;
-    resetQuiz: () => void;
-    handleQuizComplete: (tutorialId: string, score: number, totalPoints: number, answers: Record<string, string | string[]>) => void;
-  };
-  tutorialProgress: {
-    tutorialScores: any[];
-    progress: any;
-    addTutorialScore: (score: {
-      tutorialId: string;
-      score: number;
-      totalPoints: number;
-      completedAt: string;
-      answers: Record<string, string | string[]>;
-    }) => void;
-  };
+  currentView: string; // Or your ViewType
 }
 
-export function ViewManager({
-  currentView,
-  fileProcessing,
-  quizManagement,
-  tutorialProgress
-}: ViewManagerProps) {
+export function ViewManager({ currentView }: ViewManagerProps) {
+  const fileProcessing = useFileProcessing();
+  const quizManagement = useQuizManagement(null);
+  const tutorialProgress = useTutorialProgress();
+  // Move useTutorialList hook call to the top level
+  const { tutorials, loading: tutorialsLoading, error: tutorialsError } = useTutorialList();
+
   const renderTutorialView = () => {
-    const { showQuiz, showQuizSummary, selectedTutorial, quizResults, resetQuiz, handleQuizComplete, setSelectedTutorial, setShowQuiz } = quizManagement;
-    const { tutorialScores, addTutorialScore } = tutorialProgress;
+    // Remove the hook call from here
+    const { showQuiz, selectedTutorial, resetQuiz, setSelectedTutorial, setShowQuiz } = quizManagement;
+    // Use progress data from the tutorialProgress hook
+    const { progress, isLoading: progressLoading, error: progressError, submitQuizAnswers } = tutorialProgress;
 
-    if (showQuiz || selectedTutorial) {
-      let quizData;
+    // Access tutorials, tutorialsLoading, tutorialsError directly from the outer scope
+    if (tutorialsLoading || progressLoading) {
+      return <p className="text-center p-6 text-blue-600">Loading data...</p>;
+    }
 
-      if (selectedTutorial === "general") {
-        quizData = generalQuiz;
-      } else {
-        quizData = videoTutorials.find(t => t.id === selectedTutorial);
-      }
+    if (tutorialsError || progressError) {
+      return (
+        <div className="text-center p-6 text-red-600">
+          <p>Failed to load data: {tutorialsError || progressError}</p>
+        </div>
+      );
+    }
 
-      if (!quizData || !quizData.quiz || !Array.isArray(quizData.quiz)) {
-        console.error("Quiz data not found or not in correct format", { selectedTutorial, quizData });
-        return (
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-            <h2 className="text-xl font-bold text-blue-900 mb-2">Quiz Not Available</h2>
-            <p className="text-blue-600">Sorry, we couldn't load the quiz at this time.</p>
-          </div>
-        );
-      }
+    // If a tutorial is selected, show the quiz
+    if (showQuiz && selectedTutorial && tutorials) {
+      const selectedTutorialData = tutorials.find(t => t.id === selectedTutorial);
 
       return (
         <QuizComponent
-          tutorialId={quizData.id}
-          tutorialTitle={quizData.title}
-          questions={quizData.quiz}
+          tutorialId={selectedTutorial}
+          tutorialTitle={selectedTutorialData?.title || ""}
+          questions={selectedTutorialData?.questions || []}
           onComplete={(score, totalPoints, answers) => {
-            // Create a complete score object
-            const scoreRecord = {
-              tutorialId: quizData.id,
-              score,
-              totalPoints,
-              completedAt: new Date().toISOString(),
-              answers
-            };
-
-            // Update progress tracking
-            addTutorialScore(scoreRecord);
-
-            // Handle the quiz completion in quizManagement
-            handleQuizComplete(quizData.id, score, totalPoints, answers);
+            submitQuizAnswers(Number(selectedTutorial), answers);
           }}
-          onFinish={resetQuiz}
+          onFinish={() => {
+            resetQuiz();
+          }}
         />
       );
     }
 
-    // Otherwise show the tutorial list
+    // Show the tutorial list
     return (
       <TutorialList
-        tutorials={videoTutorials}
-        tutorialScores={tutorialScores}
-        onSelectTutorial={(id) => setSelectedTutorial(id)}
-        onStartQuiz={() => {
+        tutorials={tutorials || []}
+        completedTutorialIds={(progress?.completed_tutorials || []).map(String)}
+        onSelectTutorial={(id) => {
+          setSelectedTutorial(id);
           setShowQuiz(true);
-          setSelectedTutorial("general");
         }}
       />
     );
   };
 
-  // Render the appropriate view based on the currentView state
   switch (currentView) {
     case 'tutorials':
       return renderTutorialView();
 
-    case 'bestPractices':
-      return <BestPractices />;
-
     case 'progress':
-      return <ProgressPage progress={tutorialProgress.progress} />;
+      return <ProgressPage />;
 
-    default: // dashboard
+    default:
       return (
         <MainDashboard
           file={fileProcessing.file}

@@ -11,6 +11,8 @@ from .tasks import process_segmentation_task
 import logging
 from django.conf import settings
 import os
+from nibabel.processing import resample_to_output
+import nibabel as nib 
 
 logger = logging.getLogger(__name__)
 
@@ -28,40 +30,33 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
         return SegmentationTaskSerializer
     
     def create(self, request, *args, **kwargs):
-        """
-        Upload a NIFTI file for lung segmentation
-        """
-        file_obj = request.FILES.get('nifti_file')
-        if not file_obj:
-            return Response(
-                {"error": "No file was uploaded"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Validate file extension
-        file_name = file_obj.name
-        if not (file_name.endswith('.nii') or file_name.endswith('.nii.gz')):
-            return Response(
-                {"error": "File must be in NIFTI format (.nii or .nii.gz)"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Create segmentation task
-        task = SegmentationTask(
-            file_name=file_name,
-            nifti_file=file_obj,
-            status='queued'
+        nifti_file = request.FILES.get("nifti_file")
+        if not nifti_file:
+            return Response({"error": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1) Save the uploaded file
+        task = SegmentationTask.objects.create(
+            file_name=nifti_file.name,
+            nifti_file=nifti_file,
+            status="queued"
         )
-        
-        # Associate with user if authenticated
-        if request.user.is_authenticated:
-            task.user = request.user
-        
-        task.save()
-        
-        # Process task asynchronously
+
+        # 2) Down‐sample in place to 2 mm³ voxels
+        input_path = task.nifti_file.path
+        try:
+            # Load full‑resolution image
+            img = nib.load(input_path)
+            # Resample to 2×2×2 mm voxels
+            img_ds = resample_to_output(img, voxel_sizes=(1.0,1.0,1.0))
+            # Overwrite the original file with the smaller one
+            nib.save(img_ds, input_path)
+        except Exception as e:
+            # If something goes wrong, log and continue with full‑res
+            print(f"Warning: down‐sampling failed for task {task.id}: {e}")
+
+        # 3) Now kick off the async segmentation on the (now reduced) file
         process_segmentation_task.delay(str(task.id))
-        
+
         return Response(
             {"task_id": task.id, "status": task.status},
             status=status.HTTP_201_CREATED

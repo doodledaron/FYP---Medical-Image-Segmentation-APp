@@ -217,7 +217,7 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
       <p className="text-gray-600 text-sm mb-2">Hint: Use mouse scroll to navigate slices</p>
 
       {/* Debug info with more detailed information */}
-      <div className="mb-4 text-xs bg-blue-50 p-2 rounded">
+      {/* <div className="mb-4 text-xs bg-blue-50 p-2 rounded">
         <p>Loading status: {loadingStatus}</p>
         <p>Original file: {file?.name}</p>
         <p>Segmentation file: {segmentationFile ? 'Loaded' : 'Not loaded'}</p>
@@ -228,7 +228,7 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
         {loadingStatus === "segmentation-error" && (
           <p className="text-red-600">Error loading segmentation overlay. Check console for details.</p>
         )}
-      </div>
+      </div> */}
 
       <div className="flex space-x-4 mb-4">
         <button

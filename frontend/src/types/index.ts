@@ -1,30 +1,30 @@
 // src/types/index.ts
 import { ReactNode } from "react";
 
-/**
- * Quiz Question interface with support for different question types
- */
+// NEW types ----------------------------------------------------------
 export interface QuizQuestion {
   id: string;
-  type: 'multiple-choice' | 'free-text' | 'multiple-select'; // Make sure this matches the values in your data
   question: string;
+  type: 'multiple-choice' | 'multiple-select' | 'free-text';
   options?: string[];
-  correctAnswer: string | string[];
-  explanation: string;
   points: number;
+  correctAnswer: string | string[];
+  explanation?: string;
 }
 
-/**
- * Tutorial interface with metadata and quiz questions
- */
+/** Single tutorial (practice or video) returned by DRF */
 export interface Tutorial {
   id: string;
   title: string;
   thumbnail: string;
   duration: string;
-  studyNotes: string[];
-  quiz: QuizQuestion[];
+  tutorial_type: 'practice' | 'video';
+  topic: string;
+  description: string;
+  questions: QuizQuestion[];       // <-- we only need this for quizzes
+  created_at: string;
 }
+
 
 /**
  * Represents a user's score for a completed tutorial quiz
@@ -38,12 +38,15 @@ export interface TutorialScore {
 }
 
 /**
- * User's overall learning progress
+ * User's overall learning progress (aligned with backend data)
  */
-export interface Progress {
-  completedTutorials: string[];
-  scores: TutorialScore[];
-  totalPoints: number;
+export interface UserProgress {
+  completed_tutorials: number[]; // Changed from string[] to number[]
+  total_points: number;
+  completed_count: number;
+  completed_by_topic: Record<string, number>;
+  last_activity: string | null; // Changed from string to string | null
+  // Removed 'scores' as it's not provided by the hook
 }
 
 /**
@@ -57,14 +60,17 @@ export type ViewType = 'dashboard' | 'tutorials' | 'bestPractices' | 'progress';
 // src/types.ts
 export interface SegmentationResult {
   success: boolean;
-  error?: string;
-  resultUrl?: string;
+  originalFileUrl?: string;    // full‑res URL (optional)
+  previewUrl?:       string;   // low‑res preview URL (optional)
+  resultUrl?:        string;   // segmentation mask URL
   metrics?: {
     lesionVolume: number;
-    lesionCount: number;
+    lesionCount:  number;
     confidenceScore: number;
   };
+  error?: string;
 }
+
 
 /**
  * Props for file upload component
@@ -138,4 +144,29 @@ export interface QuizSummaryProps {
   score: number;
   totalPoints: number;
   onComplete: () => void;
+}
+
+export interface QuizResult {
+  id: number; // Or string if UUID
+  user: number; // User ID
+  tutorial: string; // Tutorial ID
+  tutorial_title: string;
+  tutorial_topic: string;
+  score: number;
+  total_points: number;
+  answers: Record<string, string | string[]>;
+  completed_at: string;
+}
+
+export interface QuizSubmission {
+  tutorial_id: string;
+  answers: Record<string, string | string[]>; // Or match your answer format
+}
+
+// Add this new interface for the paginated tutorial response
+export interface PaginatedTutorialsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Tutorial[];
 }
