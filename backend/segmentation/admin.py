@@ -1,15 +1,17 @@
 from datetime import timedelta
-from django.db.models import Count
-from django.db.models.functions import TruncDay
+from django.db.models import Count, Sum, Avg, F, Q, Max
+from django.db.models.functions import TruncDay, TruncMonth
 from django.utils import timezone
 from django.shortcuts import render
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib import admin
 import os
 import nibabel as nib
 import numpy as np
 import json
 import base64
 from io import BytesIO
+import traceback
 
 # Set matplotlib to use non-interactive backend
 import matplotlib
@@ -23,11 +25,17 @@ def generate_segmentation_preview(segmentation_path):
     try:
         # Check if file exists
         if not os.path.exists(segmentation_path):
+            print(f"Preview generation failed: File not found at {segmentation_path}")
             return None
             
         # Load the segmentation file
-        seg_img = nib.load(segmentation_path)
-        seg_data = seg_img.get_fdata()
+        try:
+            seg_img = nib.load(segmentation_path)
+            seg_data = seg_img.get_fdata()
+            print(f"Successfully loaded segmentation with shape: {seg_data.shape}, unique values: {np.unique(seg_data)}")
+        except Exception as e:
+            print(f"Error loading NIFTI file: {str(e)}")
+            return None
         
         # Find middle slice for each dimension
         middle_slice_z = seg_data.shape[2] // 2
@@ -50,12 +58,18 @@ def generate_segmentation_preview(segmentation_path):
             if non_zero_slices:
                 middle_slice_z = non_zero_slices[len(non_zero_slices) // 2]
                 axial_slice = seg_data[:, :, middle_slice_z].T
+                print(f"Using non-empty slice {middle_slice_z} with max value {np.max(axial_slice)}")
+            else:
+                print("No non-empty slices found in segmentation")
         
         # Display background in grayscale
         plt.imshow(np.zeros_like(axial_slice), cmap='gray', alpha=0.5)
         
-        # Overlay the segmentation in red
-        mask = axial_slice > 0
+        # Overlay the segmentation in red - handle non-binary segmentation
+        if np.max(axial_slice) > 1:
+            mask = axial_slice > 0  # Convert to binary if multiple labels
+        else:
+            mask = axial_slice > 0
         plt.imshow(mask, cmap='Reds', alpha=0.7)
         
         plt.axis('off')
@@ -73,6 +87,7 @@ def generate_segmentation_preview(segmentation_path):
         return image_base64
     except Exception as e:
         print(f"Error generating preview: {str(e)}")
+        print(traceback.format_exc())
         return None
 
 @staff_member_required
@@ -88,6 +103,28 @@ def admin_dashboard(request):
     # Segmentation stats
     task_count = SegmentationTask.objects.count()
     recent_tasks_count = SegmentationTask.objects.filter(created_at__date__gte=last_7_days).count()
+    completed_tasks = SegmentationTask.objects.filter(status='completed').count()
+    failed_tasks = SegmentationTask.objects.filter(status='failed').count()
+    
+    # Calculate success rate
+    processing_total = completed_tasks + failed_tasks
+    success_rate = (completed_tasks / processing_total * 100) if processing_total > 0 else 0
+    
+    # Get average statistics
+    avg_tumor_volume = SegmentationTask.objects.filter(
+        status='completed', 
+        tumor_volume__isnull=False
+    ).aggregate(Avg('tumor_volume'))['tumor_volume__avg'] or 0
+    
+    avg_lung_volume = SegmentationTask.objects.filter(
+        status='completed',
+        lung_volume__isnull=False
+    ).aggregate(Avg('lung_volume'))['lung_volume__avg'] or 0
+    
+    avg_lesion_count = SegmentationTask.objects.filter(
+        status='completed',
+        lesion_count__isnull=False
+    ).aggregate(Avg('lesion_count'))['lesion_count__avg'] or 0
     
     # Tasks over time
     tasks_over_time = list(SegmentationTask.objects
@@ -97,51 +134,94 @@ def admin_dashboard(request):
                          .annotate(count=Count('id'))
                          .order_by('day'))
     
-    # If there are no tasks in the last 30 days, create placeholder data
-    if not tasks_over_time:
-        # Generate placeholders for the past 30 days
-        placeholder_dates = []
-        for i in range(30, 0, -1):
-            placeholder_dates.append({
-                'day': today - timedelta(days=i),
-                'count': 0
-            })
-        tasks_over_time = placeholder_dates
+    # Status breakdown
+    status_counts = SegmentationTask.objects.values('status').annotate(count=Count('id')).order_by('status')
+    status_labels = [item['status'].title() for item in status_counts]
+    status_data = [item['count'] for item in status_counts]
     
-    # Prepare time labels and data for the chart
-    time_labels = [item['day'].strftime('%b %d') for item in tasks_over_time]
-    time_data = [item['count'] for item in tasks_over_time]
+    # Generate date-based labels even if there's no data
+    date_labels = []
+    date_counts = []
+    
+    # Generate all dates for the last 30 days
+    for i in range(30, 0, -1):
+        current_date = today - timedelta(days=i)
+        date_labels.append(current_date.strftime('%b %d'))
+        
+        # Find matching count or use 0
+        matching_day = next((item for item in tasks_over_time if item['day'].date() == current_date), None)
+        date_counts.append(matching_day['count'] if matching_day else 0)
     
     # Latest segmentation tasks
     latest_tasks = list(SegmentationTask.objects
                        .order_by('-created_at')[:10]
                        .values('id', 'file_name', 'status', 'created_at', 
-                              'lesion_volume', 'lesion_count', 'confidence_score'))
+                              'tumor_volume', 'lung_volume', 'lesion_count', 'confidence_score'))
     
     # Add preview images to latest tasks
     for task in latest_tasks:
-        # Get the task object to access the file path
-        task_obj = SegmentationTask.objects.get(id=task['id'])
-        if task_obj.result_file and hasattr(task_obj.result_file, 'path') and task_obj.result_file.path:
-            task['preview_image'] = generate_segmentation_preview(task_obj.result_file.path)
-        else:
-            task['preview_image'] = None
-        
-        # Format confidence score as percentage
-        if task['confidence_score'] is not None:
-            task['confidence_score'] = task['confidence_score'] * 100
+        try:
+            # Get the task object to access the file paths
+            task_obj = SegmentationTask.objects.get(id=task['id'])
+            
+            # Generate preview for tumor segmentation
+            if task_obj.tumor_segmentation and hasattr(task_obj.tumor_segmentation, 'path'):
+                print(f"Generating tumor preview for {task_obj.file_name}")
+                task['tumor_preview'] = generate_segmentation_preview(task_obj.tumor_segmentation.path)
+            else:
+                task['tumor_preview'] = None
+                
+            # Generate preview for lung segmentation
+            if task_obj.lung_segmentation and hasattr(task_obj.lung_segmentation, 'path'):
+                print(f"Generating lung preview for {task_obj.file_name}")
+                task['lung_preview'] = generate_segmentation_preview(task_obj.lung_segmentation.path)
+            else:
+                task['lung_preview'] = None
+            
+            # Format confidence score as percentage
+            if task['confidence_score'] is not None:
+                task['confidence_score'] = task['confidence_score'] * 100
+        except Exception as e:
+            print(f"Error processing task {task['id']}: {str(e)}")
+            print(traceback.format_exc())
+            task['tumor_preview'] = None
+            task['lung_preview'] = None
     
     context = {
         'task_count': task_count,
         'recent_tasks_count': recent_tasks_count,
-        'time_labels': json.dumps(time_labels),
-        'time_data': json.dumps(time_data),
+        'completed_tasks': completed_tasks,
+        'failed_tasks': failed_tasks,
+        'success_rate': round(success_rate, 1),
+        'avg_tumor_volume': round(avg_tumor_volume, 2),
+        'avg_lung_volume': round(avg_lung_volume, 2),
+        'avg_lesion_count': round(avg_lesion_count, 1),
+        'time_labels': json.dumps(date_labels),
+        'time_data': json.dumps(date_counts),
+        'status_labels': json.dumps(status_labels),
+        'status_data': json.dumps(status_data),
         'latest_tasks': latest_tasks,
     }
     
-    print(f"Dashboard data: {task_count} tasks, {len(latest_tasks)} latest tasks")
-    print(f"Chart data: {len(time_labels)} data points")
+    print(f"Dashboard data: {task_count} tasks, {completed_tasks} completed, {failed_tasks} failed")
+    print(f"Chart data: {len(date_labels)} data points")
     if latest_tasks:
-        print(f"First task preview: {latest_tasks[0].get('preview_image') is not None}")
+        print(f"First task previews: Tumor={latest_tasks[0].get('tumor_preview') is not None}, Lung={latest_tasks[0].get('lung_preview') is not None}")
     
     return render(request, 'admin/index.html', context)
+
+# Register the SegmentationTask model with the admin
+class SegmentationTaskAdmin(admin.ModelAdmin):
+    list_display = ('file_name', 'status', 'created_at', 'tumor_volume', 'lung_volume', 'lesion_count', 'confidence_score')
+    list_filter = ('status', 'created_at')
+    search_fields = ('file_name', 'user__username')
+    readonly_fields = ('id', 'created_at', 'updated_at')
+    
+    def get_queryset(self, request):
+        """Override to prefetch related user data"""
+        return super().get_queryset(request).select_related('user')
+
+admin.site.register(SegmentationTask, SegmentationTaskAdmin)
+
+# Override the admin index
+admin.site.index_template = 'admin/index.html'

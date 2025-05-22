@@ -5,7 +5,7 @@ import { ReactNode } from "react";
 export interface QuizQuestion {
   id: string;
   question: string;
-  type: 'multiple-choice' | 'multiple-select' | 'free-text';
+  type: 'multiple-choice' | 'multiple-select' | 'free-text' | 'true-false';
   options?: string[];
   points: number;
   correctAnswer: string | string[];
@@ -41,11 +41,11 @@ export interface TutorialScore {
  * User's overall learning progress (aligned with backend data)
  */
 export interface UserProgress {
-  completed_tutorials: string[]; // Changed from string[] to number[]
-  total_points: number;
-  completed_count: number;
-  completed_by_topic: Record<string, number>;
-  last_activity: string | null; // Changed from string to string | null
+  completedTutorials: string[]; // Changed from string[] to number[]
+  totalPoints: number;
+  completedCount: number;
+  completedByTopic: Record<string, number>;
+  lastActivity: string | null; // Changed from string to string | null
   // Removed 'scores' as it's not provided by the hook
 }
 
@@ -57,18 +57,19 @@ export type ViewType = 'dashboard' | 'tutorials' | 'bestPractices' | 'progress';
 /**
  * Result of segmentation processing
  */
-// src/types.ts
 export interface SegmentationResult {
   success: boolean;
-  originalFileUrl?: string;    // full‑res URL (optional)
-  previewUrl?:       string;   // low‑res preview URL (optional)
-  resultUrl?:        string;   // segmentation mask URL
-  metrics?: {
-    lesionVolume: number;
-    lesionCount:  number;
-    confidenceScore: number;
+  originalFileUrl: string;    // Original NIFTI file URL
+  tumorSegmentationUrl: string;   // Tumor segmentation mask URL
+  lungSegmentationUrl: string;    // Lung segmentation mask URL
+  resultUrl: string;          // Legacy property for backward compatibility (points to tumor segmentation)
+  metrics: {
+    tumorVolume: number;     // Tumor volume in cubic centimeters
+    lungVolume: number;      // Lung volume in cubic centimeters
+    lesionCount: number;     // Number of distinct lesions
+    confidenceScore: number; // Model confidence score (0-1)
   };
-  error?: string;
+  error?: string;           // Error message if success is false
 }
 
 
@@ -169,4 +170,11 @@ export interface PaginatedTutorialsResponse {
   next: string | null;
   previous: string | null;
   results: Tutorial[];
+}
+
+export interface QuizSubmissionResponse {
+  message: string;
+  score: number;
+  total_points: number;
+  // Add other relevant fields from your backend response if needed
 }

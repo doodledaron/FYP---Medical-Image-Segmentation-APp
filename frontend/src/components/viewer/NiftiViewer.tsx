@@ -1,83 +1,133 @@
 // src/components/viewer/NiftiViewer.tsx
-import { useEffect, useRef, useState } from "react";
-import { Niivue, SLICE_TYPE } from "@niivue/niivue";
-import { SegmentationResult } from "../../types";
-// @ts-ignore
-import * as pako from "pako";
+import React, { useRef, useEffect, useState } from 'react';
+import { Niivue } from '@niivue/niivue';
+import { SegmentationResult } from '../../types';
+import { Layers, Columns, AlignJustify, LayoutTemplate, Loader2, Eye, EyeOff, Activity } from 'lucide-react';
+// Import pako without ts-ignore and use the correct methods
+import pako from "pako";
 import axios from "axios";
+import { ManualSegmentationViewer } from './ManualSegmentationViewer';
 
 interface NiftiViewerProps {
   file: File;
   segmentationResult: SegmentationResult;
+  manualSegmentationScreenshot?: string | null;
+  manualSegmentationData?: {
+    segmentationMask: Uint8Array[];
+    dimensions: [number, number, number];
+    originalImageData?: Float32Array;
+    windowWidth?: number;
+    windowCenter?: number;
+  } | null;
+  showManualSegmentationPreview?: boolean;
+  setShowManualSegmentationPreview?: (show: boolean) => void;
 }
 
-// Define interface for Niivue volume objects
-interface NiivueVolume {
-  url: string;
-  name: string;
-  colormap?: string;
-  opacity?: number;
-  visible?: boolean;
-}
-
-const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) => {
-  const niivueRef = useRef<Niivue | null>(null);
-  const [view, setView] = useState(SLICE_TYPE.CORONAL);
-  const [segmentationFile, setSegmentationFile] = useState<File | null>(null);
-  const [loadingStatus, setLoadingStatus] = useState<string>("idle");
+const NiftiViewer: React.FC<NiftiViewerProps> = ({
+  file,
+  segmentationResult,
+  manualSegmentationScreenshot = null,
+  manualSegmentationData = null,
+  showManualSegmentationPreview = false,
+  setShowManualSegmentationPreview = () => { }
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const nvRef = useRef<Niivue | null>(null);
+  const [sliceView, setSliceView] = useState<'axial' | 'coronal' | 'sagittal'>('axial');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showSegmentation, setShowSegmentation] = useState(true);
+  const [showLungSegmentation, setShowLungSegmentation] = useState(false);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [segUrl, setSegUrl] = useState<string | null>(null);
+  const [lungSegUrl, setLungSegUrl] = useState<string | null>(null);
 
-  // Load segmentation file from API when available
   useEffect(() => {
-    const fetchSegmentation = async () => {
-      if (segmentationResult?.resultUrl) {
-        try {
-          setLoadingStatus("loading-segmentation");
-          console.log("Segmentation result data:", segmentationResult);
-          console.log("Fetching segmentation from URL:", segmentationResult.resultUrl);
+    if (!canvasRef.current) return;
 
-          // FIXED: Removed the strict NIFTI extension check that was causing problems
-          if (!segmentationResult.resultUrl.includes('.gz')) {
-            console.warn("Segmentation result URL might not be a compressed file:", segmentationResult.resultUrl);
-            // Continue anyway as it might still work
-          }
+    if (!nvRef.current) {
+      nvRef.current = new Niivue({
+        backColor: [0.2, 0.2, 0.2, 1],
+        show3Dcrosshair: true,
+      });
+      nvRef.current.attachToCanvas(canvasRef.current);
+    }
 
-          const response = await axios.get(segmentationResult.resultUrl, {
-            responseType: 'blob',
-          });
+    const loadData = async () => {
+      setIsLoading(true);
 
-          if (!response.data || response.data.size === 0) {
-            console.error("Segmentation file fetch returned empty data.");
-            setLoadingStatus("segmentation-empty");
-            return;
-          }
+      const nv = nvRef.current;
+      if (!nv) {
+        setIsLoading(false);
+        return;
+      }
 
-          console.log("Segmentation file fetch response:", response);
-          console.log("Response content type:", response.headers['content-type']);
-          console.log("Blob size:", response.data.size, "bytes");
+      const { originalFileUrl, tumorSegmentationUrl, lungSegmentationUrl } = segmentationResult;
 
-          // Create a File object from the blob with correct MIME type
-          const segFile = new File([response.data], 'segmentation.nii.gz', {
-            type: 'application/gzip',
-          });
+      if (!originalFileUrl || !tumorSegmentationUrl) {
+        console.error('Missing required URLs for viewer');
+        setIsLoading(false);
+        return;
+      }
 
-          console.log("Segmentation file created:", segFile);
-          setSegmentationFile(segFile);
-          setLoadingStatus("segmentation-loaded");
-        } catch (error) {
-          console.error('Error fetching segmentation file:', error);
-          setLoadingStatus("segmentation-error");
+      if (showLungSegmentation && !lungSegmentationUrl) {
+        console.error('Lung segmentation URL not available');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Set slice type based on user selection
+        switch (sliceView) {
+          case 'axial':
+            nv.setSliceType(nv.sliceTypeAxial);
+            break;
+          case 'coronal':
+            nv.setSliceType(nv.sliceTypeCoronal);
+            break;
+          case 'sagittal':
+            nv.setSliceType(nv.sliceTypeSagittal);
+            break;
+          default:
+            nv.setSliceType(nv.sliceTypeAxial);
         }
-      } else {
-        console.warn("No segmentationResult.resultUrl provided:", segmentationResult);
-        setLoadingStatus("no-segmentation-url");
+
+        // Reset volumes to clear previous state
+        nv.volumes = [];
+
+        // Load the original scan as base
+        await nv.loadVolumes([{
+          url: originalFileUrl,
+          colormap: 'gray'
+        }]);
+
+        // Add tumor segmentation as overlay
+        await nv.addVolumeFromUrl({
+          url: tumorSegmentationUrl,
+          colormap: 'red',
+          opacity: 1.0
+        });
+
+        // Add lung segmentation if enabled
+        if (showLungSegmentation && lungSegmentationUrl) {
+          await nv.addVolumeFromUrl({
+            url: lungSegmentationUrl,
+            colormap: 'blue',
+            opacity: 0.4
+          });
+        }
+
+        // Set opacity for body scan
+        nv.setOpacity(0, 1.0);
+        nv.setInterpolation(true);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading NIFTI data:', error);
+        setIsLoading(false);
       }
     };
 
-    fetchSegmentation();
-  }, [segmentationResult]);
+    loadData();
+  }, [segmentationResult, sliceView, showLungSegmentation]);
 
   // Compress NIFTI file into gzip format if it's not already
   const compressNifti = async (file: File) => {
@@ -86,7 +136,7 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
     return new Promise<Blob>((resolve, reject) => {
       reader.onload = (event) => {
         if (event.target?.result instanceof ArrayBuffer) {
-          const compressedData = pako.gzip(new Uint8Array(event.target.result));
+          const compressedData = pako.deflate(new Uint8Array(event.target.result));
           console.log("File compressed successfully.");
           resolve(new Blob([compressedData], { type: "application/gzip" }));
         } else {
@@ -97,8 +147,33 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
     });
   };
 
+  // Function to fetch and compress a remote file
+  const fetchAndCompressRemoteFile = async (url: string, filename: string) => {
+    try {
+      console.log(`Fetching remote file from ${url}`);
+      const response = await axios.get(url, { responseType: 'arraybuffer' });
+      const fileData = response.data;
+
+      // Check if file is already compressed
+      if (url.endsWith('.gz')) {
+        console.log("Remote file is already compressed");
+        const blob = new Blob([fileData], { type: "application/gzip" });
+        return URL.createObjectURL(blob);
+      } else {
+        console.log("Compressing remote file");
+        const compressedData = pako.deflate(new Uint8Array(fileData));
+        const compressedBlob = new Blob([compressedData], { type: "application/gzip" });
+        return URL.createObjectURL(compressedBlob);
+      }
+    } catch (error) {
+      console.error("Error fetching or compressing remote file:", error);
+      return url; // Fall back to original URL on error
+    }
+  };
+
   // Create object URLs for files only once
   useEffect(() => {
+    // Handle original file
     if (file) {
       const createFileUrl = async () => {
         let fileBlob = file;
@@ -117,10 +192,30 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
       createFileUrl();
     }
 
-    if (segmentationFile) {
-      const url = URL.createObjectURL(segmentationFile);
-      setSegUrl(url);
-      console.log("Segmentation file URL created:", url);
+    // Handle tumor segmentation file if URL is available
+    if (segmentationResult?.tumorSegmentationUrl && !segUrl) {
+      const createSegUrl = async () => {
+        const url = await fetchAndCompressRemoteFile(
+          segmentationResult.tumorSegmentationUrl,
+          "tumor_segmentation.nii.gz"
+        );
+        setSegUrl(url);
+        console.log("URL created for tumor segmentation file:", url);
+      };
+      createSegUrl();
+    }
+
+    // Handle lung segmentation file if URL is available
+    if (segmentationResult?.lungSegmentationUrl && !lungSegUrl) {
+      const createLungSegUrl = async () => {
+        const url = await fetchAndCompressRemoteFile(
+          segmentationResult.lungSegmentationUrl,
+          "lung_segmentation.nii.gz"
+        );
+        setLungSegUrl(url);
+        console.log("URL created for lung segmentation file:", url);
+      };
+      createLungSegUrl();
     }
 
     // Cleanup URLs when component unmounts
@@ -131,149 +226,182 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({ file, segmentationResult }) =
       if (segUrl) {
         URL.revokeObjectURL(segUrl);
       }
-    };
-  }, [file, segmentationFile]);
-
-  // Load the NIFTI file into the viewer
-  useEffect(() => {
-    const loadNifti = async () => {
-      console.log("Loading NIFTI file into viewer with view type:", view);
-      console.log("Show segmentation:", showSegmentation);
-      setLoadingStatus("loading-viewer");
-
-      const canvas = document.getElementById("niivue-canvas") as HTMLCanvasElement;
-      if (!canvas) {
-        console.error("Canvas not found!");
-        setLoadingStatus("canvas-error");
-        return;
-      }
-
-      // Cleanup previous Niivue instance if it exists
-      if (niivueRef.current) {
-        niivueRef.current.closeDrawing();
-        niivueRef.current = null;
-      }
-
-      // Create new Niivue instance
-      niivueRef.current = new Niivue();
-      niivueRef.current.attachToCanvas(canvas);
-      niivueRef.current.setSliceType(view);
-
-      if (!fileUrl) {
-        console.error("No file URL available!");
-        setLoadingStatus("no-file-error");
-        return;
-      }
-
-      // Prepare volumes for the viewer
-      let volumes: NiivueVolume[] = [];
-
-      // Always add the main volume (original file)
-      volumes.push({
-        url: fileUrl,
-        name: file.name,
-      });
-
-      // Add segmentation overlay if available and visible
-      if (segUrl && showSegmentation) {
-        volumes.push({
-          url: segUrl,
-          name: 'segmentation.nii.gz',
-          // Using 'red' colormap as requested
-          colormap: 'red',
-          opacity: 0.7,
-          visible: true,
-        });
-      }
-
-      // Load volumes into the viewer
-      console.log("Loading volumes into Niivue:", volumes);
-      try {
-        if (volumes.length > 0) {
-          await niivueRef.current.loadVolumes(volumes);
-          setLoadingStatus("volumes-loaded");
-          console.log("Volumes loaded successfully");
-        } else {
-          console.error("No volumes to load!");
-          setLoadingStatus("no-volumes-error");
-        }
-      } catch (error) {
-        console.error("Error loading volumes:", error);
-        setLoadingStatus("loading-volumes-error");
+      if (lungSegUrl) {
+        URL.revokeObjectURL(lungSegUrl);
       }
     };
+  }, [file, segmentationResult]);
 
-    // Only load if we have the original file
-    if (file && fileUrl) {
-      loadNifti();
-    }
-  }, [file, fileUrl, segUrl, view, showSegmentation]);
+  // Check if we have either a screenshot or full segmentation data
+  const hasManualSegmentation = manualSegmentationScreenshot || manualSegmentationData;
 
-
+  // Function to toggle lung segmentation
+  const toggleLungSegmentation = () => {
+    setShowLungSegmentation(!showLungSegmentation);
+  };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-4 border border-blue-100">
-      <h2 className="text-lg font-semibold text-blue-900 mb-2">2D NIFTI Viewer</h2>
-      <p className="text-gray-600 text-sm mb-2">Hint: Use mouse scroll to navigate slices</p>
+    <div className="w-full">
+      {/* Main content area - flex layout for side-by-side display */}
+      <div className={`flex ${showManualSegmentationPreview ? 'flex-row gap-4' : 'flex-col'}`}>
+        {/* NiftiViewer canvas container - adjusted width when side-by-side */}
+        <div className={`relative ${showManualSegmentationPreview ? 'w-1/2' : 'w-full'} h-[calc(100vh-150px)] min-h-[700px]`}>
+          {/* Control panel - Top right */}
+          <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+            {/* Manual Segmentation Preview Toggle - only show if we have manual segmentation data */}
+            {hasManualSegmentation && (
+              <div className="bg-black/30 p-2 rounded-lg">
+                <div className="text-xs text-white font-semibold mb-1">Manual Segmentation</div>
+                <button
+                  onClick={() => setShowManualSegmentationPreview(!showManualSegmentationPreview)}
+                  className={`
+                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
+                    ${showManualSegmentationPreview
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                    }
+                  `}
+                >
+                  {showManualSegmentationPreview ? (
+                    <>
+                      <EyeOff size={14} />
+                      Hide Manual
+                    </>
+                  ) : (
+                    <>
+                      <Eye size={14} />
+                      Show Manual
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
-      {/* Debug info with more detailed information */}
-      {/* <div className="mb-4 text-xs bg-blue-50 p-2 rounded">
-        <p>Loading status: {loadingStatus}</p>
-        <p>Original file: {file?.name}</p>
-        <p>Segmentation file: {segmentationFile ? 'Loaded' : 'Not loaded'}</p>
-        <p>Segmentation visible: {showSegmentation ? 'Yes' : 'No'}</p>
-        {segmentationResult?.resultUrl && (
-          <p>Result URL: {segmentationResult.resultUrl}</p>
-        )}
-        {loadingStatus === "segmentation-error" && (
-          <p className="text-red-600">Error loading segmentation overlay. Check console for details.</p>
-        )}
-      </div> */}
+            {/* Segmentation Type Toggle */}
+            {segmentationResult?.lungSegmentationUrl && (
+              <div className="bg-black/30 p-2 rounded-lg">
+                <div className="text-xs text-white font-semibold mb-1">Segmentation</div>
+                <button
+                  onClick={toggleLungSegmentation}
+                  disabled={isLoading}
+                  className={`
+                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors mb-2
+                    ${showLungSegmentation
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                    }
+                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                >
+                  <Activity size={14} />
+                  {showLungSegmentation ? 'Hide Lung' : 'Show Lung'}
+                </button>
+              </div>
+            )}
 
-      <div className="flex space-x-4 mb-4">
-        <button
-          onClick={() => setView(SLICE_TYPE.AXIAL)}
-          className={`px-4 py-2 ${view === SLICE_TYPE.AXIAL ? 'bg-blue-800' : 'bg-blue-600'} text-white rounded-lg`}
-        >
-          Axial View
-        </button>
-        <button
-          onClick={() => setView(SLICE_TYPE.CORONAL)}
-          className={`px-4 py-2 ${view === SLICE_TYPE.CORONAL ? 'bg-blue-800' : 'bg-blue-600'} text-white rounded-lg`}
-        >
-          Coronal View
-        </button>
-        <button
-          onClick={() => setView(SLICE_TYPE.SAGITTAL)}
-          className={`px-4 py-2 ${view === SLICE_TYPE.SAGITTAL ? 'bg-blue-800' : 'bg-blue-600'} text-white rounded-lg`}
-        >
-          Sagittal View
-        </button>
-      </div>
+            {/* Slice view toggle */}
+            <div className="bg-black/30 p-2 rounded-lg">
+              <div className="text-xs text-white font-semibold mb-1">Slice View</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSliceView('axial')}
+                  disabled={isLoading}
+                  className={`
+                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
+                    ${sliceView === 'axial'
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                    }
+                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                >
+                  <AlignJustify size={14} />
+                  Axial
+                </button>
+                <button
+                  onClick={() => setSliceView('coronal')}
+                  disabled={isLoading}
+                  className={`
+                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
+                    ${sliceView === 'coronal'
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                    }
+                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                >
+                  <Columns size={14} />
+                  Coronal
+                </button>
+                <button
+                  onClick={() => setSliceView('sagittal')}
+                  disabled={isLoading}
+                  className={`
+                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
+                    ${sliceView === 'sagittal'
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                    }
+                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                >
+                  <LayoutTemplate size={14} />
+                  Sagittal
+                </button>
+              </div>
+            </div>
+          </div>
 
-      {segmentationFile && (
-        <div className="bg-green-50 border border-green-100 p-2 rounded mb-4">
-          <p className="text-green-700 text-sm">
-            ✓ Segmentation overlay loaded successfully
-            {!showSegmentation && " (currently hidden)"}
-          </p>
+          <canvas
+            ref={canvasRef}
+            width="800"
+            height="600"
+            className="w-full h-full rounded-lg"
+          ></canvas>
+
+          {/* Loading overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg">
+              <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+                <div className="text-white text-sm font-medium">Loading view...</div>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-      <div className="flex items-center space-x-4 mb-4">
-        <button
-          onClick={() => setShowSegmentation(prev => !prev)}
-          className={`px-4 py-2 ${showSegmentation ? 'bg-indigo-600' : 'bg-gray-500'} text-white rounded-lg`}
-        >
-          {showSegmentation ? "Hide Segmentation" : "Show Segmentation"}
-        </button>
-      </div>
 
-      <canvas
-        id="niivue-canvas"
-        width="800"
-        height="600"
-        className="w-full h-auto border border-gray-300"
-      ></canvas>
+        {/* Manual Segmentation Preview - Side panel */}
+        {showManualSegmentationPreview && (
+          <div className="w-1/2 h-[calc(100vh-150px)] min-h-[700px] rounded-lg border border-blue-200 flex flex-col">
+            {manualSegmentationData ? (
+              /* If we have full segmentation data, use the interactive viewer */
+              <ManualSegmentationViewer
+                segmentationMask={manualSegmentationData.segmentationMask}
+                dimensions={manualSegmentationData.dimensions}
+                originalImageData={manualSegmentationData.originalImageData}
+                windowWidth={manualSegmentationData.windowWidth}
+                windowCenter={manualSegmentationData.windowCenter}
+              />
+            ) : manualSegmentationScreenshot ? (
+              /* Fallback to screenshot if we only have that */
+              <>
+                <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 text-center font-medium rounded-t-lg">
+                  Manual Segmentation Preview
+                </div>
+                <div className="flex-1 flex items-center justify-center bg-gray-900 rounded-b-lg overflow-hidden">
+                  <div className="relative max-w-full max-h-full p-2">
+                    <img
+                      src={manualSegmentationScreenshot}
+                      alt="Manual Segmentation"
+                      className="max-w-full max-h-[calc(100vh-200px)] object-contain rounded shadow-lg"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

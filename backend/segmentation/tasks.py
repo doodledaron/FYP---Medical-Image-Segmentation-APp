@@ -35,59 +35,70 @@ def process_segmentation_task(task_id):
         # Run segmentation
         try:
             print(f"Running nnUNet segmentation on {input_file_path}")
-            result_file_path = nnunet_handler.predict(input_file_path)
+            result_files = nnunet_handler.predict(input_file_path)
         except Exception as e:
             print(f"Using fallback segmentation due to error: {str(e)}")
-            result_file_path = nnunet_handler.fallback_inference(input_file_path)
+            result_files = nnunet_handler.fallback_inference(input_file_path)
         
-        if not os.path.exists(result_file_path):
-            raise FileNotFoundError(f"Result file not found at {result_file_path}")
+        # Verify both result files exist
+        for seg_type, file_path in result_files.items():
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Result file not found at {file_path}")
+            print(f"{seg_type} file generated at: {file_path}")
         
-        print(f"Result file generated at: {result_file_path}")
+        # Update database references
+        media_relative_paths = {
+            'tumor_segmentation': os.path.relpath(result_files['tumor_segmentation'], settings.MEDIA_ROOT),
+            'lung_segmentation': os.path.relpath(result_files['lung_segmentation'], settings.MEDIA_ROOT)
+        }
         
-        # The path is already what we want, just update the database reference
-        media_relative_path = os.path.relpath(result_file_path, settings.MEDIA_ROOT)
+        # Clear any existing file references
+        for field_name in ['tumor_segmentation', 'lung_segmentation']:
+            old_file = getattr(task, field_name)
+            if old_file:
+                old_file_path = old_file.path
+                old_file.delete(save=False)
+                # Only delete the old file if it's different from the new one
+                if os.path.exists(old_file_path) and old_file_path != result_files[field_name]:
+                    try:
+                        os.remove(old_file_path)
+                        print(f"Removed old {field_name} file: {old_file_path}")
+                    except OSError as e:
+                        print(f"Failed to remove old file {old_file_path}: {e}")
         
-        # Clear any existing file reference
-        if task.result_file:
-            old_file_path = task.result_file.path
-            task.result_file.delete(save=False)
-            # Only delete the old file if it's different from the new one
-            if os.path.exists(old_file_path) and old_file_path != result_file_path:
-                try:
-                    os.remove(old_file_path)
-                    print(f"Removed old result file: {old_file_path}")
-                except OSError as e:
-                    print(f"Failed to remove old file {old_file_path}: {e}")
+        # Update the task with the file paths
+        task.tumor_segmentation.name = media_relative_paths['tumor_segmentation']
+        task.lung_segmentation.name = media_relative_paths['lung_segmentation']
+        task.save(update_fields=['tumor_segmentation', 'lung_segmentation'])
         
-        # Update the task with the file path
-        task.result_file.name = media_relative_path
-        task.save(update_fields=['result_file'])
-        
-        # Verify the saved file can be loaded with nibabel
-        try:
-            test_load = nib.load(task.result_file.path)
-            test_shape = test_load.shape
-            test_datatype = test_load.get_data_dtype()
-            print(f"Verification successful - Saved NIFTI shape: {test_shape}, datatype: {test_datatype}")
-        except Exception as e:
-            print(f"WARNING - Saved file verification failed: {str(e)}")
+        # Verify the saved files can be loaded with nibabel
+        for seg_type, file_path in result_files.items():
+            try:
+                test_load = nib.load(file_path)
+                test_shape = test_load.shape
+                test_datatype = test_load.get_data_dtype()
+                print(f"Verification successful - Saved {seg_type} NIFTI shape: {test_shape}, datatype: {test_datatype}")
+            except Exception as e:
+                print(f"WARNING - Saved {seg_type} file verification failed: {str(e)}")
         
         # Set task to completed with metrics
         try:
-            metrics = nnunet_handler.analyze_segmentation(task.result_file.path)
-            task.lesion_volume = metrics.get('lesion_volume')
-            task.lesion_count = metrics.get('lesion_count')
-            task.confidence_score = metrics.get('confidence_score')
-            print(f"Analysis complete with metrics: {metrics}")
+            # Analyze both segmentations
+            tumor_metrics = nnunet_handler.analyze_segmentation(task.tumor_segmentation.path)
+            lung_metrics = nnunet_handler.analyze_segmentation(task.lung_segmentation.path)
+            
+            # Update task with combined metrics
+            task.tumor_volume = tumor_metrics.get('tumor_volume')
+            task.lung_volume = lung_metrics.get('lung_volume')
+            task.lesion_count = tumor_metrics.get('lesion_count')
+            task.confidence_score = tumor_metrics.get('confidence_score')
+            print(f"Analysis complete with metrics: Tumor={tumor_metrics}, Lung={lung_metrics}")
         except Exception as e:
             print(f"WARNING - Failed to compute metrics: {str(e)}")
         
         task.status = 'completed'
         task.save()
         print(f"Completed segmentation task {task_id}")
-        
-
         
     except SegmentationTask.DoesNotExist:
         print(f"Task {task_id} not found")

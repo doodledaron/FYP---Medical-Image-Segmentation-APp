@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Tutorial, QuizQuestion, QuizResult, UserProgress
+from django.contrib.auth.models import User
 
 class QuizQuestionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -20,8 +21,21 @@ class TutorialSerializer(serializers.ModelSerializer):
         ]
 
     def get_has_completed(self, obj):
-        # Implement your logic here, or return False for now
-        return False
+        # For testing: Get the first superuser instead of the authenticated user
+        try:
+            user = User.objects.filter(is_superuser=True).first()
+            if not user:
+                user = User.objects.first()  # Fallback to any user
+            if not user:
+                return False
+                
+            progress = user.progress
+            is_completed = obj.id in progress.completed_tutorials
+            print(f"Tutorial {obj.id} completed status: {is_completed} for user {user.username}")
+            return is_completed
+        except Exception as e:
+            print(f"Error checking completion status: {str(e)}")
+            return False
 
 
 class TutorialDetailSerializer(serializers.ModelSerializer):
@@ -40,14 +54,21 @@ class TutorialDetailSerializer(serializers.ModelSerializer):
     
     def get_has_completed(self, obj):
         """Check if current user has completed this tutorial"""
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            try:
-                progress = request.user.progress
-                return obj.id in progress.completed_tutorials
-            except:
+        # For testing: Get the first superuser instead of the authenticated user
+        try:
+            user = User.objects.filter(is_superuser=True).first()
+            if not user:
+                user = User.objects.first()  # Fallback to any user
+            if not user:
                 return False
-        return False
+                
+            progress = user.progress
+            is_completed = obj.id in progress.completed_tutorials
+            print(f"Tutorial {obj.id} completed status: {is_completed} for user {user.username}")
+            return is_completed
+        except Exception as e:
+            print(f"Error checking completion status: {str(e)}")
+            return False
 
 
 class QuizResultSerializer(serializers.ModelSerializer):

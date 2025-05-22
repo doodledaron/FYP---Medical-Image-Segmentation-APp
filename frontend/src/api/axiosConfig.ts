@@ -5,11 +5,10 @@ import axios from 'axios';
 // Example: 'http://localhost:8000/api' or just '/api' if frontend and backend are served from the same origin
 
 const axiosInstance = axios.create({
-    // ← change this one line:
     baseURL: 'http://localhost:8000/api',
     timeout: 10000,
     headers: { 'Content-Type': 'application/json' },
-  })
+})
 
 // --- Optional: Interceptors for Authentication/Error Handling ---
 
@@ -45,6 +44,5 @@ const axiosInstance = axios.create({
 //     return Promise.reject(new Error(errorMessage)); // Reject with a standardized error
 //   }
 // );
-
 
 export default axiosInstance;

@@ -1,33 +1,67 @@
 // src/components/learning/quiz/QuizComponent.tsx
 import React, { useState, useEffect } from 'react';
 import { CheckSquare, Type, ListChecks, AlertCircle, ChevronRight, Award, ArrowLeft } from 'lucide-react';
-import { QuizQuestion as QuizQuestionType } from '../../../types';
+import { QuizQuestion as QuizQuestionType, QuizSubmissionResponse } from '../../../types';
 import { QuizSummary } from './QuizSummary';
 
 interface QuizComponentProps {
-  tutorialId: string;
+  tutorialId: string | number;
   tutorialTitle: string;
   questions: QuizQuestionType[];
+  showSummary?: boolean;
+  answers?: Record<string, string | string[]>;
+  initialScore?: number;
+  initialTotalPoints?: number;
   onComplete: (score: number, totalPoints: number, answers: Record<string, string | string[]>) => void;
   onFinish: () => void;
+  onSubmitToBackend?: (answers: Record<string, string | string[]>) => Promise<QuizSubmissionResponse | undefined>;
 }
 
 export const QuizComponent: React.FC<QuizComponentProps> = ({
   tutorialId,
   tutorialTitle,
   questions,
+  showSummary = false,
+  answers: externalAnswers,
+  initialScore = 0,
+  initialTotalPoints = 0,
   onComplete,
   onFinish,
+  onSubmitToBackend,
 }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
-  const [showSummary, setShowSummary] = useState(false);
-  const [score, setScore] = useState(0);
-  const [totalPoints, setTotalPoints] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>(externalAnswers || {});
+  const [score, setScore] = useState(initialScore);
+  const [totalPoints, setTotalPoints] = useState(initialTotalPoints);
 
   // Animation states
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [animating, setAnimating] = useState(false);
+
+  // Update internal state if external answers change
+  useEffect(() => {
+    if (externalAnswers && Object.keys(externalAnswers).length > 0) {
+      console.log("Setting answers from external source:", externalAnswers);
+      setAnswers(externalAnswers);
+    }
+  }, [externalAnswers]);
+
+  // Update score and total points from props
+  useEffect(() => {
+    if (initialScore > 0 || initialTotalPoints > 0) {
+      console.log("Setting score from props:", initialScore, initialTotalPoints);
+      setScore(initialScore);
+      setTotalPoints(initialTotalPoints);
+    }
+  }, [initialScore, initialTotalPoints]);
+
+  // Add mount/unmount tracking
+  useEffect(() => {
+    console.log("QuizComponent MOUNTED with tutorialId:", tutorialId);
+    return () => {
+      console.log("QuizComponent UNMOUNTED with tutorialId:", tutorialId);
+    };
+  }, [tutorialId]);
 
   // If there are no questions, show an empty state
   if (!questions || questions.length === 0) {
@@ -99,6 +133,7 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
   };
 
   const handleNext = (answer: string | string[]) => {
+    console.log("Quiz handleNext called", { currentQuestion, questionCount: questions.length });
     const updatedAnswers = {
       ...answers,
       [questions[currentQuestion].id]: answer,
@@ -119,9 +154,22 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
       setTotalPoints(calculatedTotalPoints);
 
       setAnimating(true);
-      setTimeout(() => {
-        setShowSummary(true);
+      setTimeout(async () => {
+        console.log("Submitting answers and showing summary");
+        
+        // First call onComplete to submit the quiz results locally
         onComplete(calculatedScore, calculatedTotalPoints, updatedAnswers);
+        
+        // Submit to backend if the handler is provided
+        if (onSubmitToBackend) {
+          try {
+            const response = await onSubmitToBackend(updatedAnswers);
+            console.log("Quiz successfully submitted to backend", response);
+          } catch (error) {
+            console.error("Failed to submit quiz to backend:", error);
+          }
+        }
+        // Summary will be shown by parent via props
       }, 300);
     }
   };
@@ -171,6 +219,32 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
                 <span className="text-blue-900 font-medium">{option}</span>
               </button>
             ))}
+          </div>
+        );
+
+      case 'true-false':
+        return (
+          <div className="space-y-4">
+            <button
+              onClick={() => handleAnswer('true')}
+              className={`w-full p-5 text-left rounded-xl border-2 transition-all duration-300 ${
+                currentAnswer === 'true'
+                  ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md transform scale-[1.02]'
+                  : 'border-blue-100 hover:border-blue-300 hover:shadow-sm'
+              }`}
+            >
+              <span className="text-blue-900 font-medium">True</span>
+            </button>
+            <button
+              onClick={() => handleAnswer('false')}
+              className={`w-full p-5 text-left rounded-xl border-2 transition-all duration-300 ${
+                currentAnswer === 'false'
+                  ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md transform scale-[1.02]'
+                  : 'border-blue-100 hover:border-blue-300 hover:shadow-sm'
+              }`}
+            >
+              <span className="text-blue-900 font-medium">False</span>
+            </button>
           </div>
         );
 
@@ -232,6 +306,7 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
     if (type === 'multiple-choice') return <ListChecks className="w-7 h-7 text-blue-600" />;
     if (type === 'free-text') return <Type className="w-7 h-7 text-blue-600" />;
     if (type === 'multiple-select') return <CheckSquare className="w-7 h-7 text-blue-600" />;
+    if (type === 'true-false') return <AlertCircle className="w-7 h-7 text-blue-600" />;
     return <AlertCircle className="w-7 h-7 text-blue-600" />;
   };
 

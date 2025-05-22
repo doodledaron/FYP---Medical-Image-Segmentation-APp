@@ -1,6 +1,5 @@
 // src/App.tsx
 import { useState } from "react";
-import { Sidebar } from "./components/layout/Sidebar";
 import { ViewManager } from "./components/ViewManager";
 import { useFileProcessing } from "./hooks/useFileProcessing";
 import { useQuizManagement } from "./hooks/useQuizManagement";
@@ -11,30 +10,17 @@ type ViewType = "dashboard" | "tutorials" | "progress";
 export default function App(): JSX.Element {
   const [currentView, setCurrentView] = useState<ViewType>("dashboard");
 
-  // Get tutorial progress hooks
+  // Get hooks
   const tutorialProgress = useTutorialProgress();
-
-  // Get other hooks
-  // Pass null as the initial selected tutorial
-  const quizManagement = useQuizManagement(null);
+  const quizManagement = useQuizManagement();
   const fileProcessing = useFileProcessing();
 
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100">
-      <Sidebar
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-indigo-50">
+      <ViewManager
         currentView={currentView}
         setCurrentView={setCurrentView}
-        // Ensure progress is not null before passing, or handle null in Sidebar
-        progress={tutorialProgress.progress ?? undefined}
-        // Removed tutorialScoresLength prop
       />
-
-      <div className="pl-64">
-        <ViewManager
-          currentView={currentView}
-        />
-      </div>
     </div>
   );
 }

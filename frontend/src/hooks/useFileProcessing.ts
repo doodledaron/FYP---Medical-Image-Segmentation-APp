@@ -11,26 +11,50 @@ export function useFileProcessing() {
   const [loading, setLoading] = useState<boolean>(false);
   const [segmentationResult, setSegmentationResult] = useState<SegmentationResult | null>(null);
   const [show3D, setShow3D] = useState<boolean>(false);
+  const [showSegmentationChoice, setShowSegmentationChoice] = useState<boolean>(false);
+  const [segmentationMode, setSegmentationMode] = useState<"manual" | "ai" | null>(null);
+  const [showManualSegmentation, setShowManualSegmentation] = useState<boolean>(false);
+  const [manualSegmentationData, setManualSegmentationData] = useState<any>(null);
+  const [manualSegmentationScreenshot, setManualSegmentationScreenshot] = useState<string | null>(null);
+  const [showManualSegmentationPreview, setShowManualSegmentationPreview] = useState<boolean>(false);
 
   const handleFileSelect = async (selectedFile: File | null): Promise<void> => {
     // Handle clearing the file
     if (!selectedFile) {
       setFile(null);
       setSegmentationResult(null);
+      setShowSegmentationChoice(false);
+      setSegmentationMode(null);
+      setShowManualSegmentation(false);
       return;
     }
 
     setFile(selectedFile);
-    setLoading(true);
     setSegmentationResult(null);
+    setShowSegmentationChoice(true);
+    setSegmentationMode(null);
+  };
 
+  const handleSegmentationChoice = (mode: "manual" | "ai"): void => {
+    setSegmentationMode(mode);
+    setShowSegmentationChoice(false);
+    
+    if (mode === "manual") {
+      setShowManualSegmentation(true);
+    } else {
+      startAISegmentation();
+    }
+  };
+
+  const startAISegmentation = async (): Promise<void> => {
+    if (!file) return;
+    
+    setLoading(true);
+    
     try {
       // Create form data for the file upload
       const formData = new FormData();
-      formData.append("nifti_file", selectedFile);
-
-      // Log the file being uploaded
-      console.log("Uploading file:", selectedFile.name, "Size:", selectedFile.size);
+      formData.append("nifti_file", file);
 
       // Send the file to the Django API with increased timeout
       const response = await axios.post(`${API_URL}/tasks/`, formData, {
@@ -40,16 +64,13 @@ export function useFileProcessing() {
         timeout: 60000, // 60 seconds timeout for the initial upload
       });
 
-      console.log("Task created:", response.data);
       const taskId = response.data.task_id;
 
       // Poll for task completion with longer timeout
       let taskComplete = false;
       let attempts = 0;
-      const maxAttempts = 120; // Increased from 30 to 60 attempts
-      const pollingInterval = 3000; // Increased from 2 seconds to 3 seconds
-
-      console.log("Starting to poll for task completion...");
+      const maxAttempts = 120;
+      const pollingInterval = 3000;
 
       while (!taskComplete && attempts < maxAttempts) {
         attempts++;
@@ -57,52 +78,36 @@ export function useFileProcessing() {
 
         try {
           // Check task status with timeout
-          const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/status/`, {
+          const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/`, {
             timeout: 10000 // 10 seconds timeout for status checks
           });
-
-          console.log(`Poll attempt ${attempts}:`, statusResponse.data);
 
           if (statusResponse.data.status === "completed") {
             taskComplete = true;
 
-            // Log the complete response for debugging
-            console.log("Complete response data:", statusResponse.data);
+            // Get the URLs for both segmentations
+            const tumorSegUrl = statusResponse.data.tumor_segmentation_url;
+            const lungSegUrl = statusResponse.data.lung_segmentation_url;
+            const originalNiftiUrl = statusResponse.data.nifti_file_url;
 
-            // *** ADD THIS LINE TO PRINT THE ORIGINAL NIFTI FILE URL ***
-            console.log("Received original nifti_file URL from backend:", statusResponse.data.nifti_file_url);
-
-            // Get the result URL - fixed to use the correct field name (result_file_url)
-            const resultUrl = statusResponse.data.result_file_url;
-            console.log("Received result URL:", resultUrl);
-        
-            // Don't validate file extension, as Django might have renamed it
-            // Just ensure it's a URL string
-            if (!resultUrl) {
-              console.warn("Warning: No result URL received from backend");
-              console.log("Available fields:", Object.keys(statusResponse.data));
-            } else {
-              console.log("Result URL received successfully");
-            }
-            
             // Create a result object with the data needed by your viewers
-            setSegmentationResult({
+            const result = {
               success: true,
-              originalFileUrl: statusResponse.data.nifti_file_url, // <-- Add this line
-              previewUrl:      statusResponse.data.preview_url,     // low‑res you’ll use by default
-              resultUrl: resultUrl,
+              originalFileUrl: originalNiftiUrl,
+              tumorSegmentationUrl: tumorSegUrl,
+              lungSegmentationUrl: lungSegUrl,
+              resultUrl: tumorSegUrl, // For backward compatibility
               metrics: {
-                lesionVolume: statusResponse.data.lesion_volume,
+                tumorVolume: statusResponse.data.tumor_volume,
+                lungVolume: statusResponse.data.lung_volume,
                 lesionCount: statusResponse.data.lesion_count,
                 confidenceScore: statusResponse.data.confidence_score
               }
-            });
-
-            console.log("Task completed successfully!");
+            };
+            
+            setSegmentationResult(result);
           } else if (statusResponse.data.status === "failed") {
             throw new Error(statusResponse.data.error || "Processing failed");
-          } else {
-            console.log(`Task still processing (${statusResponse.data.status}), polling again...`);
           }
         } catch (pollError) {
           console.error("Error during polling:", pollError);
@@ -137,9 +142,12 @@ export function useFileProcessing() {
         success: false, 
         error: errorMessage,
         originalFileUrl: '',
+        tumorSegmentationUrl: '',
+        lungSegmentationUrl: '',
         resultUrl: '',
         metrics: {
-          lesionVolume: 0,
+          tumorVolume: 0,
+          lungVolume: 0,
           lesionCount: 0,
           confidenceScore: 0
         }
@@ -149,12 +157,32 @@ export function useFileProcessing() {
     }
   };
 
+  const completeManualSegmentation = (segData: any) => {
+    setManualSegmentationData(segData.segmentationMask);
+    // Store the screenshot if available
+    if (segData.screenshot) {
+      setManualSegmentationScreenshot(segData.screenshot);
+    }
+    setShowManualSegmentation(false);
+    startAISegmentation();
+  };
+
   return { 
     file, 
     loading, 
     segmentationResult, 
     show3D, 
     setShow3D, 
-    handleFileSelect 
+    handleFileSelect,
+    showSegmentationChoice,
+    segmentationMode,
+    handleSegmentationChoice,
+    showManualSegmentation,
+    setShowManualSegmentation,
+    completeManualSegmentation,
+    manualSegmentationData,
+    manualSegmentationScreenshot,
+    showManualSegmentationPreview,
+    setShowManualSegmentationPreview
   };
 }

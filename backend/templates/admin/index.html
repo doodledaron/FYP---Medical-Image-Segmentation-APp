@@ -7,7 +7,7 @@
   <style>
     .dashboard-container {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
       gap: 20px;
       margin-bottom: 20px;
     }
@@ -105,7 +105,7 @@
     .header-title {
       font-size: 24px;
       font-weight: 600;
-      color: white;
+      color: #333;
       margin-bottom: 5px;
     }
     .header-subtitle {
@@ -152,6 +152,17 @@
     .detail-link:hover {
       background-color: #bae6fd;
     }
+    .chart-container {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 768px) {
+      .chart-container {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
@@ -166,21 +177,40 @@
 <div class="dashboard-container">
   <div class="dashboard-card">
     <div class="dashboard-card-title">Segmentation Tasks</div>
-    <div class="dashboard-card-value">{{ task_count }}</div>
-    <div class="dashboard-card-subtitle">{{ recent_tasks_count }} in last week</div>
+    <div class="dashboard-card-value">{{ task_count|default:"0" }}</div>
+    <div class="dashboard-card-subtitle">{{ recent_tasks_count|default:"0" }} in last week</div>
   </div>
   
   <div class="dashboard-card">
-    <div class="dashboard-card-title">Processing Speed</div>
-    <div class="dashboard-card-value">Real-time</div>
-    <div class="dashboard-card-subtitle">Powered by nnUNet</div>
+    <div class="dashboard-card-title">Completed Tasks</div>
+    <div class="dashboard-card-value">{{ completed_tasks|default:"0" }}</div>
+    <div class="dashboard-card-subtitle">{{ success_rate|default:"0" }}% success rate</div>
+  </div>
+  
+  <div class="dashboard-card">
+    <div class="dashboard-card-title">Avg. Tumor Volume</div>
+    <div class="dashboard-card-value">{{ avg_tumor_volume|default:"0" }} cc</div>
+    <div class="dashboard-card-subtitle">From {{ completed_tasks|default:"0" }} completed tasks</div>
+  </div>
+  
+  <div class="dashboard-card">
+    <div class="dashboard-card-title">Avg. Lung Volume</div>
+    <div class="dashboard-card-value">{{ avg_lung_volume|default:"0" }} cc</div>
+    <div class="dashboard-card-subtitle">Total lung volume per scan</div>
   </div>
 </div>
 
 <!-- Charts -->
-<div class="dashboard-chart">
-  <div class="dashboard-chart-title">Segmentation Tasks (Last 30 days)</div>
-  <canvas id="taskLineChart" height="200"></canvas>
+<div class="chart-container">
+  <div class="dashboard-chart">
+    <div class="dashboard-chart-title">Segmentation Tasks (Last 30 days)</div>
+    <canvas id="taskLineChart" height="200"></canvas>
+  </div>
+  
+  <div class="dashboard-chart">
+    <div class="dashboard-chart-title">Status Breakdown</div>
+    <canvas id="statusChart" height="200"></canvas>
+  </div>
 </div>
 
 <!-- Tables -->
@@ -193,7 +223,8 @@
         <th>Status</th>
         <th>Date</th>
         <th>Metrics</th>
-        <th>Preview</th>
+        <th>Tumor Preview</th>
+        <th>Lung Preview</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -208,8 +239,12 @@
         </td>
         <td>{{ task.created_at|date:"M d, Y" }}</td>
         <td>
-          {% if task.lesion_volume is not None %}
-            <span class="metrics-pill lesion-pill">{{ task.lesion_volume|floatformat:1 }} cc</span>
+          {% if task.tumor_volume is not None %}
+            <span class="metrics-pill lesion-pill">{{ task.tumor_volume|floatformat:1 }} cc tumor</span>
+          {% endif %}
+          
+          {% if task.lung_volume is not None %}
+            <span class="metrics-pill count-pill">{{ task.lung_volume|floatformat:1 }} cc lung</span>
           {% endif %}
           
           {% if task.lesion_count is not None %}
@@ -221,8 +256,15 @@
           {% endif %}
         </td>
         <td>
-          {% if task.preview_image %}
-            <img src="data:image/png;base64,{{ task.preview_image }}" alt="Preview" class="preview-image">
+          {% if task.tumor_preview %}
+            <img src="data:image/png;base64,{{ task.tumor_preview }}" alt="Tumor Preview" class="preview-image">
+          {% else %}
+            <span class="text-gray-400">No preview</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if task.lung_preview %}
+            <img src="data:image/png;base64,{{ task.lung_preview }}" alt="Lung Preview" class="preview-image">
           {% else %}
             <span class="text-gray-400">No preview</span>
           {% endif %}
@@ -235,7 +277,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="6" style="text-align: center; padding: 20px;">No tasks found</td>
+        <td colspan="7" style="text-align: center; padding: 20px;">No tasks found</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -244,13 +286,10 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-
-    // const statusLabels =  /* {{ status_labels|safe }} */ []
-    // const statusData = /* {{ status_data|safe }} */ [];
     // Task Line Chart
     const taskCtx = document.getElementById('taskLineChart').getContext('2d');
-    const timeLabels = /* {{ time_labels|safe }} */ [];
-    const timeData =  /* {{ time_data|safe }}; */ [];
+    const timeLabels = {{ time_labels|default:"[]"|safe }};
+    const timeData = {{ time_data|default:"[]"|safe }};
     
     new Chart(taskCtx, {
       type: 'line',
@@ -277,6 +316,42 @@
             ticks: {
               precision: 0
             }
+          }
+        }
+      }
+    });
+    
+    // Status Breakdown Chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusLabels = {{ status_labels|default:"[]"|safe }};
+    const statusData = {{ status_data|default:"[]"|safe }};
+    
+    // Generate colors based on status
+    const statusColors = statusLabels.map(label => {
+      switch(label.toLowerCase()) {
+        case 'completed': return 'rgba(16, 185, 129, 0.7)';
+        case 'failed': return 'rgba(239, 68, 68, 0.7)';
+        case 'processing': return 'rgba(59, 130, 246, 0.7)';
+        case 'queued': return 'rgba(156, 163, 175, 0.7)';
+        default: return 'rgba(107, 114, 128, 0.7)';
+      }
+    });
+    
+    new Chart(statusCtx, {
+      type: 'doughnut',
+      data: {
+        labels: statusLabels,
+        datasets: [{
+          data: statusData,
+          backgroundColor: statusColors,
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'right'
           }
         }
       }
