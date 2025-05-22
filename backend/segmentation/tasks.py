@@ -8,6 +8,10 @@ import os
 import time
 import nibabel as nib
 import shutil
+import logging
+
+# Get logger
+logger = logging.getLogger(__name__)
 
 @shared_task
 def dummy_log_test():
@@ -17,9 +21,21 @@ def dummy_log_test():
 def process_segmentation_task(task_id):
     """Process a segmentation task asynchronously"""
     from .models import SegmentationTask
-    from .nnunet_handler_mock import NNUNetHandlerMock as NNUNetHandler
+    from .nnunet_handler import NNUNetHandler
     
     print(f"Starting segmentation task {task_id}")
+    
+    # Setup a handler to capture all logging and print it
+    class CeleryLogHandler(logging.Handler):
+        def emit(self, record):
+            msg = self.format(record)
+            # Print to console so it shows up in Celery logs
+            print(f"[NNUNET] {msg}")
+    
+    # Add the handler to the root logger to capture all logs
+    celery_handler = CeleryLogHandler()
+    celery_handler.setLevel(logging.INFO)
+    logging.getLogger().addHandler(celery_handler)
     
     try:
         # Get the task
@@ -38,6 +54,8 @@ def process_segmentation_task(task_id):
             result_files = nnunet_handler.predict(input_file_path)
         except Exception as e:
             print(f"Using fallback segmentation due to error: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
             result_files = nnunet_handler.fallback_inference(input_file_path)
         
         # Verify both result files exist
@@ -114,6 +132,9 @@ def process_segmentation_task(task_id):
             task.save(update_fields=['status', 'error', 'updated_at'])
         except Exception as update_error:
             print(f"Failed to update task status: {str(update_error)}")
+    finally:
+        # Remove the logging handler
+        logging.getLogger().removeHandler(celery_handler)
 
 @shared_task
 def cleanup_old_tasks(days=30):

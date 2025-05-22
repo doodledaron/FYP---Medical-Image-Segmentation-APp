@@ -1,10 +1,89 @@
 // src/hooks/useFileProcessing.ts
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SegmentationResult } from "../types";
 import axios from "axios";
+import * as fs from 'fs';
 
 // Define API URL - you'll want to configure this based on your environment
 const API_URL = "http://localhost:8000/api/segmentation";
+
+// Mock data paths for local testing
+const MOCK_DATA = {
+  originalNiftiUrl: "/mock_lung_scan.nii.gz",
+  lungSegmentationUrl: "/mock_lung_segmentation.nii.gz",
+  tumorSegmentationUrl: "/mock_tumor_segmentation.nii.gz",
+};
+
+// Global preloaded mock file variable
+let PRELOADED_MOCK_FILE: File | null = null;
+
+// Include a small base64 encoded sample NIFTI file as fallback
+// This is a minimal valid NIFTI file structure that can be used if loading from public directory fails
+const MINIMAL_NIFTI_BASE64 = `
+H4sIAAAAAAAAA52T0U7bMBSG73diez15BOCmCNig4qYXBcpg3SrohlRN3SdI7cRZnSiDs6ru3Y/dbEEDDhJX
+tpPz+f/Ox3Y4fiAcPpKQhvhBxGM6dIOAeq7vBdQP6ZD4NPRcj4RBGAz9IDyCIzmSY3iG4IRGf6jLhlNgUFH4
+OyuWHJOQhS5zXslImSUlIbKJsFVa8XKxyvHeBitCdNrWtbdFNH6nFCnF5xJVmvNVjqCRGK9EmS3RlBmfL1Xz
+CrNsiaIU7draVOk2/ziR2gINwGMprko8zUWV4YjnJV9iXWmHTDymxbZqCn5P/HUl9/K6HGXFslgZX/UC0GeR
+L1Qj9nP/EAx8zzuAzcVUm60rekewUvXeS1YrtoK0yDVbK3aE1WJl9D2bPqdLj7dUd/i66VTrZtWQKWXDv+Kv
+8qLGtvpilhHuai6554aNuImCzgnumvH8lQZ912Xnk7PJ2Xh6fjGdTb4ZMIDGdDOrRtdQ7f67F9y+Z57GceS6
+84iAf5eKnWZ0fTo9PfPczw8CdNhlmb864CsOAiT1C/x7kWZzfZnqjpBk5bI0DSON1KK/dNR6oJoXcln/R0Is
+tBFS2bIRVX5/E31QH7//+Xp7cyrGkW57ChWinT0eRv4BAAD//ze+D6l9AwAA
+`;
+
+// Function to preload the mock file (call this at app startup)
+export async function preloadMockFile(): Promise<void> {
+  try {
+    console.log("Preloading mock file...");
+    
+    // First try to fetch from the public directory
+    try {
+      const response = await fetch(MOCK_DATA.originalNiftiUrl);
+      if (response.ok) {
+        const blob = await response.blob();
+        console.log("Mock blob loaded from public dir, size:", blob.size);
+        
+        if (blob.size > 0) {
+          PRELOADED_MOCK_FILE = new File([blob], "mock_lung_scan.nii.gz", {
+            type: "application/gzip",
+            lastModified: Date.now()
+          });
+          
+          console.log("Mock file successfully preloaded from public dir, size:", PRELOADED_MOCK_FILE.size);
+          return;
+        }
+      }
+    } catch (fetchError) {
+      console.error("Failed to fetch from public dir:", fetchError);
+    }
+    
+    // If public directory fetch failed, use the base64 fallback
+    console.log("Using base64 fallback for mock file");
+    try {
+      // Convert base64 to binary
+      const base64 = MINIMAL_NIFTI_BASE64.replace(/\s/g, '');
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Create file from binary data
+      PRELOADED_MOCK_FILE = new File([bytes.buffer], "mock_lung_scan.nii.gz", {
+        type: "application/gzip",
+        lastModified: Date.now()
+      });
+      
+      console.log("Mock file successfully created from base64, size:", PRELOADED_MOCK_FILE.size);
+    } catch (base64Error) {
+      console.error("Failed to create mock file from base64:", base64Error);
+    }
+  } catch (error) {
+    console.error("Failed to preload mock file:", error);
+  }
+}
+
+// Try to preload the mock file as soon as this module is imported
+preloadMockFile();
 
 export function useFileProcessing() {
   const [file, setFile] = useState<File | null>(null);
@@ -17,6 +96,14 @@ export function useFileProcessing() {
   const [manualSegmentationData, setManualSegmentationData] = useState<any>(null);
   const [manualSegmentationScreenshot, setManualSegmentationScreenshot] = useState<string | null>(null);
   const [showManualSegmentationPreview, setShowManualSegmentationPreview] = useState<boolean>(false);
+  const [isMockData, setIsMockData] = useState<boolean>(false);
+  
+  // Also try to load the mock file on component mount
+  useEffect(() => {
+    if (!PRELOADED_MOCK_FILE) {
+      preloadMockFile();
+    }
+  }, []);
 
   const handleFileSelect = async (selectedFile: File | null): Promise<void> => {
     // Handle clearing the file
@@ -26,10 +113,22 @@ export function useFileProcessing() {
       setShowSegmentationChoice(false);
       setSegmentationMode(null);
       setShowManualSegmentation(false);
+      setIsMockData(false);
       return;
     }
 
-    setFile(selectedFile);
+    // If this is a mock file, set isMockData flag
+    const isMock = selectedFile.name.includes('mock');
+    setIsMockData(isMock);
+    
+    // If this is a mock file and we have a preloaded version, use that
+    if (isMock && PRELOADED_MOCK_FILE) {
+      console.log("Using preloaded mock file with size:", PRELOADED_MOCK_FILE.size);
+      setFile(PRELOADED_MOCK_FILE);
+    } else {
+      setFile(selectedFile);
+    }
+    
     setSegmentationResult(null);
     setShowSegmentationChoice(true);
     setSegmentationMode(null);
@@ -40,9 +139,79 @@ export function useFileProcessing() {
     setShowSegmentationChoice(false);
     
     if (mode === "manual") {
-      setShowManualSegmentation(true);
+      // For mock data, use directUrl approach
+      if (isMockData) {
+        // Set mock URL directly for manual segmentation
+        console.log("Setting direct URL for manual segmentation with mock data");
+        console.log("Mock URL path:", MOCK_DATA.originalNiftiUrl);
+        // We still need a file object (even if empty) for component props
+        if (!file || file.size === 0) {
+          const emptyFile = new File([], "mock_lung_scan.nii.gz", { 
+            type: "application/gzip", 
+            lastModified: Date.now() 
+          });
+          setFile(emptyFile);
+        }
+        // The directUrl will be passed to the ManualSegmentation component
+        setShowManualSegmentation(true);
+      } else {
+        // Real data - proceed with manual segmentation as normal
+        setShowManualSegmentation(true);
+      }
     } else {
-      startAISegmentation();
+      // For AI segmentation, check if it's mock data
+      if (isMockData) {
+        startMockSegmentation();
+      } else {
+        startAISegmentation();
+      }
+    }
+  };
+
+  // New function for mock segmentation
+  const startMockSegmentation = async (): Promise<void> => {
+    setLoading(true);
+    
+    try {
+      // Create mock result using relative URLs 
+      const mockResult = {
+        success: true,
+        originalFileUrl: MOCK_DATA.originalNiftiUrl,
+        tumorSegmentationUrl: MOCK_DATA.tumorSegmentationUrl,
+        lungSegmentationUrl: MOCK_DATA.lungSegmentationUrl,
+        resultUrl: MOCK_DATA.tumorSegmentationUrl,
+        metrics: {
+          tumorVolume: 45.7,
+          lungVolume: 3245.2,
+          lesionCount: 2,
+          confidenceScore: 0.89
+        }
+      };
+      
+      // Simulate delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      setSegmentationResult(mockResult);
+      
+      console.log("Mock segmentation complete with paths:", mockResult);
+    } catch (error) {
+      console.error("Error processing mock file:", error);
+      setSegmentationResult({ 
+        success: false, 
+        error: "Failed to process mock data",
+        originalFileUrl: '',
+        tumorSegmentationUrl: '',
+        lungSegmentationUrl: '',
+        resultUrl: '',
+        metrics: {
+          tumorVolume: 0,
+          lungVolume: 0,
+          lesionCount: 0,
+          confidenceScore: 0
+        }
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -164,7 +333,13 @@ export function useFileProcessing() {
       setManualSegmentationScreenshot(segData.screenshot);
     }
     setShowManualSegmentation(false);
-    startAISegmentation();
+    
+    // Check if we're using mock data
+    if (isMockData) {
+      startMockSegmentation();
+    } else {
+      startAISegmentation();
+    }
   };
 
   return { 
@@ -183,6 +358,7 @@ export function useFileProcessing() {
     manualSegmentationData,
     manualSegmentationScreenshot,
     showManualSegmentationPreview,
-    setShowManualSegmentationPreview
+    setShowManualSegmentationPreview,
+    isMockData
   };
 }

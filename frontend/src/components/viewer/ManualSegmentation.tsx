@@ -1,18 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Brain, Eraser, MousePointer, ChevronRight, Layers, RotateCw } from 'lucide-react';
+import { Brain, Eraser, MousePointer, ChevronRight, Layers, RotateCw, AlignJustify, Columns, LayoutTemplate, FlipVertical } from 'lucide-react';
 import * as nifti from 'nifti-reader-js';
 import pako from 'pako';
 
-// Define view types (now only axial)
-type ViewType = 'axial';
+// Define view types
+type ViewType = 'axial' | 'coronal' | 'sagittal';
 
 interface ManualSegmentationProps {
   file: File;
   onComplete: (segmentationData: any) => void;
   onCancel: () => void;
+  directUrl?: string; // Added new optional parameter for direct URL loading
 }
 
-export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegmentationProps) {
+export function ManualSegmentation({ file, onComplete, onCancel, directUrl }: ManualSegmentationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<'brush' | 'eraser'>('brush');
@@ -25,7 +26,8 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
   const [error, setError] = useState<string | null>(null);
   const [windowWidth, setWindowWidth] = useState(2048);
   const [windowCenter, setWindowCenter] = useState(1024);
-  const [currentView] = useState<ViewType>('axial'); // Fixed to axial only
+  const [currentView, setCurrentView] = useState<ViewType>('axial');
+  const [flipped, setFlipped] = useState(false);
   
   // Load the NIFTI file data
   useEffect(() => {
@@ -33,157 +35,244 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
       setLoading(true);
       setError(null);
       try {
-        // Read the file as an ArrayBuffer
-        const reader = new FileReader();
+        if (!file && !directUrl) {
+          throw new Error("No file or URL provided");
+        }
         
-        reader.onload = async (e) => {
+        let buffer: ArrayBuffer;
+        
+        // If directUrl is provided, load from URL instead of file
+        if (directUrl) {
+          console.log("Loading NIFTI directly from URL:", directUrl);
           try {
-            if (!e.target || !e.target.result) {
-              throw new Error("Failed to read file");
+            const response = await fetch(directUrl);
+            if (!response.ok) {
+              throw new Error(`Failed to fetch from URL: ${response.status} ${response.statusText}`);
             }
-            
-            let buffer = e.target.result as ArrayBuffer;
-            console.log("File loaded, size:", buffer.byteLength);
-            
-            // Check if this is a gzipped file (.nii.gz)
-            const isGzipped = file.name.toLowerCase().endsWith('.gz') || 
-                             (new Uint8Array(buffer, 0, 2)[0] === 0x1f && new Uint8Array(buffer, 0, 2)[1] === 0x8b);
-            
-            console.log("Is file gzipped:", isGzipped);
-            
-            let uncompressedBuffer: ArrayBuffer;
-            
-            if (isGzipped) {
+            buffer = await response.arrayBuffer();
+            console.log("Successfully loaded from URL, size:", buffer.byteLength);
+          } catch (urlError: any) {
+            console.error("Error loading from URL:", urlError);
+            throw new Error(`Failed to load from URL: ${urlError.message}`);
+          }
+        } else {
+          console.log("Starting to load NIFTI file:", file.name, "size:", file.size);
+          
+          // If file size is 0, it's likely corrupted or empty
+          if (file.size === 0) {
+            throw new Error("File is empty (0 bytes). Please provide a valid NIFTI file.");
+          }
+          
+          // Read the file as an ArrayBuffer
+          buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              if (!e.target || !e.target.result) {
+                reject(new Error("Failed to read file"));
+              } else {
+                resolve(e.target.result as ArrayBuffer);
+              }
+            };
+            reader.onerror = (err) => {
+              console.error("FileReader error:", err);
+              reject(new Error("Error reading file"));
+            };
+            reader.readAsArrayBuffer(file);
+          });
+          console.log("File loaded, size:", buffer.byteLength);
+        }
+        
+        // Safety check for buffer size
+        if (buffer.byteLength === 0) {
+          throw new Error("File buffer is empty. Cannot process an empty file.");
+        }
+        
+        // Check if this is a gzipped file (.nii.gz)
+        const fileArray = new Uint8Array(buffer);
+        
+        // Safety check before accessing array elements
+        if (fileArray.length < 2) {
+          throw new Error("File data is too small to be a valid NIFTI file");
+        }
+        
+        const isGzipped = (directUrl && directUrl.toLowerCase().endsWith('.gz')) || 
+                         (file && file.name.toLowerCase().endsWith('.gz')) || 
+                         (fileArray[0] === 0x1f && fileArray[1] === 0x8b);
+        
+        console.log("Is file gzipped:", isGzipped, "Magic bytes:", 
+                   fileArray[0] !== undefined ? fileArray[0].toString(16) : "undefined", 
+                   fileArray[1] !== undefined ? fileArray[1].toString(16) : "undefined");
+        
+        let uncompressedBuffer: ArrayBuffer;
+        
+        if (isGzipped) {
+          try {
+            // For direct URL, try to interpret the data directly first as it might be pre-processed
+            if (directUrl) {
+              console.log("Using direct URL data without decompression first");
               try {
-                // Decompress the gzipped data
-                console.log("Decompressing gzipped data...");
-                const compressedData = new Uint8Array(buffer);
-                const decompressedData = pako.inflate(compressedData);
+                // Check if this is a valid NIFTI file without decompression
+                if (nifti.isNIFTI(buffer)) {
+                  console.log("Direct URL data is already a valid NIFTI without decompression");
+                  uncompressedBuffer = buffer;
+                } else {
+                  console.log("Direct URL data is not a valid NIFTI without decompression, trying decompression");
+                  throw new Error("Need to decompress");
+                }
+              } catch (directCheckError) {
+                // If that fails, then try decompression
+                console.log("Failed direct NIFTI check, attempting decompression");
+                const decompressedData = pako.inflate(fileArray);
                 uncompressedBuffer = decompressedData.buffer;
-                console.log("Decompression complete, new size:", uncompressedBuffer.byteLength);
-              } catch (gzipError) {
-                console.error("Failed to decompress gzipped data:", gzipError);
-                throw new Error("Failed to decompress the NIFTI file. Make sure it's a valid .nii.gz file.");
               }
             } else {
-              uncompressedBuffer = buffer;
+              // Standard file decompression
+              console.log("Decompressing gzipped data...");
+              const decompressedData = pako.inflate(fileArray);
+              uncompressedBuffer = decompressedData.buffer;
             }
             
-            // Check if this is a valid NIFTI file
-            if (!nifti.isNIFTI(uncompressedBuffer)) {
-              console.error("Not a valid NIFTI file");
-              throw new Error("Not a valid NIFTI file");
+            console.log("Decompression/processing complete, new size:", uncompressedBuffer.byteLength);
+          } catch (gzipError) {
+            console.error("Failed to decompress gzipped data:", gzipError);
+            
+            // More detailed error handling
+            if (buffer.byteLength < 1000) {
+              console.error("Buffer appears too small for a valid NIFTI file");
             }
             
-            // Parse the NIFTI header
-            const header = nifti.readHeader(uncompressedBuffer);
-            const image = nifti.readImage(header, uncompressedBuffer);
-            
-            if (!header || !image) {
-              throw new Error("Failed to parse NIFTI file");
+            // For direct URL loading, try using the buffer directly as a last resort
+            if (directUrl) {
+              console.log("Decompression failed, but trying direct NIFTI parsing as fallback");
+              try {
+                if (nifti.isNIFTI(buffer)) {
+                  console.log("Buffer is valid NIFTI without decompression - using as is");
+                  uncompressedBuffer = buffer;
+                } else {
+                  throw new Error("Not a valid NIFTI file either");
+                }
+              } catch (fallbackError) {
+                console.error("Fallback NIFTI parsing failed:", fallbackError);
+                throw new Error("Failed to decompress or parse the NIFTI file. Make sure it's a valid NIFTI file.");
+              }
+            } else {
+              throw new Error("Failed to decompress the NIFTI file. Make sure it's a valid .nii.gz file.");
             }
-            
-            // Extract dimensions
-            const width = header.dims[1];
-            const height = header.dims[2];
-            const depth = header.dims[3];
-            
-            console.log("NIFTI dimensions:", width, "x", height, "x", depth);
-            console.log("NIFTI datatype:", header.datatypeCode);
-            console.log("NIFTI spatial units:", header.xyzt_units);
-            
-            // Prepare image data object
-            const pixelData = new Float32Array(width * height * depth);
-            
-            // Determine actual data type and convert to Float32Array for standardized handling
-            let srcData: any;
-            switch (header.datatypeCode) {
-              case nifti.NIFTI1.TYPE_UINT8:
-                srcData = new Uint8Array(image);
-                break;
-              case nifti.NIFTI1.TYPE_INT16:
-                srcData = new Int16Array(image);
-                break;
-              case nifti.NIFTI1.TYPE_INT32:
-                srcData = new Int32Array(image);
-                break;
-              case nifti.NIFTI1.TYPE_FLOAT32:
-                srcData = new Float32Array(image);
-                break;
-              case nifti.NIFTI1.TYPE_FLOAT64:
-                srcData = new Float64Array(image);
-                break;
-              case nifti.NIFTI1.TYPE_INT8:
-                srcData = new Int8Array(image);
-                break;
-              case nifti.NIFTI1.TYPE_UINT16:
-                srcData = new Uint16Array(image);
-                break;
-              case nifti.NIFTI1.TYPE_UINT32:
-                srcData = new Uint32Array(image);
-                break;
-              default:
-                srcData = new Uint8Array(image);
-            }
-            
-            // Find min and max for window level adjustment
-            let min = Number.MAX_VALUE;
-            let max = Number.MIN_VALUE;
-            
-            for (let i = 0; i < srcData.length; i++) {
-              const val = srcData[i];
-              if (val < min) min = val;
-              if (val > max) max = val;
-              pixelData[i] = val;
-            }
-            
-            console.log("NIFTI data range:", min, "to", max);
-            
-            // Set auto window level based on data
-            setWindowCenter((min + max) / 2);
-            setWindowWidth(max - min);
-            
-            // Set up imageData object
-            const imgData = {
-              dimensions: [width, height, depth],
-              pixelData: pixelData,
-              min: min,
-              max: max
-            };
-            
-            setImageData(imgData);
-            
-            // Set initial slice index and max slices for axial view
-            const axialMid = Math.floor(depth / 2);
-            setSliceIndex(axialMid);
-            setMaxSlices(depth);
-            
-            // Initialize segmentation data for each slice
-            const initSegData = Array(depth).fill(null).map(() => 
-              new Uint8Array(width * height).fill(0)
-            );
-            setSegmentationData(initSegData);
-            
-            setLoading(false);
-            
-            // Render the middle slice
-            setTimeout(() => {
-              renderCanvas(axialMid, imgData, initSegData);
-            }, 100);
-            
-          } catch (parseError: any) {
-            console.error("Error parsing NIFTI:", parseError);
-            setError(parseError.message || "Failed to parse NIFTI data");
-            setLoading(false);
           }
+        } else {
+          uncompressedBuffer = buffer;
+        }
+        
+        // Safety check for uncompressed buffer
+        if (!uncompressedBuffer || uncompressedBuffer.byteLength === 0) {
+          throw new Error("Uncompressed data is empty. Cannot process.");
+        }
+        
+        // Check if this is a valid NIFTI file
+        if (!nifti.isNIFTI(uncompressedBuffer)) {
+          console.error("Not a valid NIFTI file");
+          throw new Error("Not a valid NIFTI file");
+        }
+        
+        // Parse the NIFTI header
+        const header = nifti.readHeader(uncompressedBuffer);
+        if (!header) {
+          throw new Error("Failed to read NIFTI header");
+        }
+        
+        const image = nifti.readImage(header, uncompressedBuffer);
+        if (!image) {
+          throw new Error("Failed to read NIFTI image data");
+        }
+        
+        // Extract dimensions
+        const width = header.dims[1];
+        const height = header.dims[2];
+        const depth = header.dims[3];
+        
+        console.log("NIFTI dimensions:", width, "x", height, "x", depth);
+        console.log("NIFTI datatype:", header.datatypeCode);
+        console.log("NIFTI spatial units:", header.xyzt_units);
+        
+        // Prepare image data object
+        const pixelData = new Float32Array(width * height * depth);
+        
+        // Determine actual data type and convert to Float32Array for standardized handling
+        let srcData: any;
+        switch (header.datatypeCode) {
+          case nifti.NIFTI1.TYPE_UINT8:
+            srcData = new Uint8Array(image);
+            break;
+          case nifti.NIFTI1.TYPE_INT16:
+            srcData = new Int16Array(image);
+            break;
+          case nifti.NIFTI1.TYPE_INT32:
+            srcData = new Int32Array(image);
+            break;
+          case nifti.NIFTI1.TYPE_FLOAT32:
+            srcData = new Float32Array(image);
+            break;
+          case nifti.NIFTI1.TYPE_FLOAT64:
+            srcData = new Float64Array(image);
+            break;
+          case nifti.NIFTI1.TYPE_INT8:
+            srcData = new Int8Array(image);
+            break;
+          case nifti.NIFTI1.TYPE_UINT16:
+            srcData = new Uint16Array(image);
+            break;
+          case nifti.NIFTI1.TYPE_UINT32:
+            srcData = new Uint32Array(image);
+            break;
+          default:
+            srcData = new Uint8Array(image);
+        }
+        
+        // Find min and max for window level adjustment
+        let min = Number.MAX_VALUE;
+        let max = Number.MIN_VALUE;
+        
+        for (let i = 0; i < srcData.length; i++) {
+          const val = srcData[i];
+          if (val < min) min = val;
+          if (val > max) max = val;
+          pixelData[i] = val;
+        }
+        
+        console.log("NIFTI data range:", min, "to", max);
+        
+        // Set auto window level based on data
+        setWindowCenter((min + max) / 2);
+        setWindowWidth(max - min);
+        
+        // Set up imageData object
+        const imgData = {
+          dimensions: [width, height, depth],
+          pixelData: pixelData,
+          min: min,
+          max: max
         };
         
-        reader.onerror = () => {
-          setError("Error reading file");
-          setLoading(false);
-        };
+        setImageData(imgData);
         
-        reader.readAsArrayBuffer(file);
+        // Set initial slice index and max slices for axial view
+        const axialMid = Math.floor(depth / 2);
+        setSliceIndex(axialMid);
+        setMaxSlices(depth);
+        
+        // Initialize segmentation data for each slice
+        const initSegData = Array(depth).fill(null).map(() => 
+          new Uint8Array(width * height).fill(0)
+        );
+        setSegmentationData(initSegData);
+        
+        setLoading(false);
+        
+        // Render the middle slice
+        setTimeout(() => {
+          renderCanvas(axialMid, imgData, initSegData);
+        }, 100);
+        
       } catch (error: any) {
         console.error("Error loading NIFTI file:", error);
         setError(error.message || "Unknown error loading NIFTI file");
@@ -192,7 +281,39 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
     };
     
     loadNiftiData();
-  }, [file]);
+  }, [file, directUrl]);
+
+  // When view type changes, update maxSlices and reset to middle slice
+  useEffect(() => {
+    if (imageData) {
+      const [width, height, depth] = imageData.dimensions;
+      
+      // Set max slices based on view orientation
+      let newMaxSlices: number;
+      switch (currentView) {
+        case 'axial':
+          newMaxSlices = depth;
+          break;
+        case 'coronal':
+          newMaxSlices = height;
+          break;
+        case 'sagittal':
+          newMaxSlices = width;
+          break;
+        default:
+          newMaxSlices = depth;
+      }
+      
+      setMaxSlices(newMaxSlices);
+      
+      // Reset to middle slice
+      const middleSlice = Math.floor(newMaxSlices / 2);
+      setSliceIndex(middleSlice);
+      
+      // Re-render with new view
+      renderCanvas(middleSlice);
+    }
+  }, [currentView, flipped]);
 
   // Apply window level to pixel value
   const applyWindowLevel = (value: number): number => {
@@ -217,24 +338,68 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
     
     const [width, height, depth] = imgData.dimensions;
     
-    // Set canvas dimensions for axial view
-    canvas.width = width;
-    canvas.height = height;
+    // Set canvas dimensions based on view orientation
+    let canvasWidth: number, canvasHeight: number;
+    
+    switch (currentView) {
+      case 'axial':
+        canvasWidth = width;
+        canvasHeight = height;
+        break;
+      case 'coronal':
+        canvasWidth = width;
+        canvasHeight = depth;
+        break;
+      case 'sagittal':
+        canvasWidth = height;
+        canvasHeight = depth;
+        break;
+      default:
+        canvasWidth = width;
+        canvasHeight = height;
+    }
+    
+    // Set canvas dimensions
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
     
     // Clear the canvas
     ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     
     // Create an ImageData object
-    const imageDataObj = ctx.createImageData(width, height);
+    const imageDataObj = ctx.createImageData(canvasWidth, canvasHeight);
     
-    // Fill the ImageData for axial view
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        // Convert 2D canvas coordinates to 3D volume coordinates for axial view
-        const voxelX = x;
-        const voxelY = y;
-        const voxelZ = slice;
+    // Fill the ImageData based on view orientation
+    for (let y = 0; y < canvasHeight; y++) {
+      for (let x = 0; x < canvasWidth; x++) {
+        // Apply vertical flip if needed
+        const displayY = flipped ? (canvasHeight - 1 - y) : y;
+        
+        // Convert canvas coordinates to volume coordinates based on view
+        let voxelX: number, voxelY: number, voxelZ: number;
+        
+        switch (currentView) {
+          case 'axial':
+            voxelX = x;
+            voxelY = displayY; // Apply flip to Y in axial view
+            voxelZ = slice;
+            break;
+          case 'coronal':
+            voxelX = x;
+            voxelY = slice;
+            voxelZ = displayY; // Apply flip to Z in coronal view
+            break;
+          case 'sagittal':
+            voxelX = slice;
+            voxelY = x;
+            voxelZ = displayY; // Apply flip to Z in sagittal view
+            break;
+          default:
+            voxelX = x;
+            voxelY = displayY;
+            voxelZ = slice;
+        }
         
         // Ensure coordinates are within bounds
         const validCoords = (
@@ -262,7 +427,7 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
         const displayValue = applyWindowLevel(pixelValue);
         
         // Set pixel in image data
-        const i = (y * width + x) * 4;
+        const i = (y * canvasWidth + x) * 4;
         imageDataObj.data[i] = displayValue; // R
         imageDataObj.data[i + 1] = displayValue; // G
         imageDataObj.data[i + 2] = displayValue; // B
@@ -301,12 +466,35 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
     const canvasX = Math.floor((e.clientX - rect.left) * scaleX);
     const canvasY = Math.floor((e.clientY - rect.top) * scaleY);
     
-    // Convert canvas coordinates to volume coordinates for axial view
+    // Apply vertical flip if needed when converting from canvas coordinates to volume
+    const effectiveCanvasY = flipped ? (canvas.height - 1 - canvasY) : canvasY;
+    
+    // Convert canvas coordinates to volume coordinates based on view
     const [width, height, depth] = imageData.dimensions;
     
-    const voxelX = canvasX;
-    const voxelY = canvasY;
-    const voxelZ = sliceIndex;
+    let voxelX: number, voxelY: number, voxelZ: number;
+    
+    switch (currentView) {
+      case 'axial':
+        voxelX = canvasX;
+        voxelY = effectiveCanvasY; // Use flipped Y coordinate
+        voxelZ = sliceIndex;
+        break;
+      case 'coronal':
+        voxelX = canvasX;
+        voxelY = sliceIndex;
+        voxelZ = effectiveCanvasY; // Use flipped Y coordinate
+        break;
+      case 'sagittal':
+        voxelX = sliceIndex;
+        voxelY = canvasX;
+        voxelZ = effectiveCanvasY; // Use flipped Y coordinate
+        break;
+      default:
+        voxelX = canvasX;
+        voxelY = effectiveCanvasY;
+        voxelZ = sliceIndex;
+    }
     
     // Ensure coordinates are within bounds
     if (
@@ -316,33 +504,65 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
       voxelZ >= segmentationData.length
     ) return;
     
-    // Update the segmentation data for the current slice
+    // Create a copy of the segmentation data for modification
     const currentSegData = [...segmentationData];
-    const currentSliceData = new Uint8Array(currentSegData[voxelZ]);
     
     // Draw on the segmentation data using a circular brush
     for (let dy = -brushSize; dy <= brushSize; dy++) {
       for (let dx = -brushSize; dx <= brushSize; dx++) {
+        // Only apply pixels within the circular brush radius
         const distance = Math.sqrt(dx * dx + dy * dy);
         if (distance <= brushSize) {
-          const px = voxelX + dx;
-          const py = voxelY + dy;
+          let px: number, py: number, pz: number;
+          
+          // Assign coordinates based on view
+          switch (currentView) {
+            case 'axial':
+              px = voxelX + dx;
+              py = voxelY + dy;
+              pz = voxelZ;
+              break;
+            case 'coronal':
+              px = voxelX + dx;
+              py = voxelY;
+              pz = voxelZ + dy;
+              break;
+            case 'sagittal':
+              px = voxelX;
+              py = voxelY + dx;
+              pz = voxelZ + dy;
+              break;
+            default:
+              px = voxelX + dx;
+              py = voxelY + dy;
+              pz = voxelZ;
+          }
           
           // Check bounds
-          if (px >= 0 && px < width && py >= 0 && py < height) {
+          if (px >= 0 && px < width && py >= 0 && py < height && pz >= 0 && pz < depth) {
+            // Update the correct slice based on the Z coordinate
+            const sliceToUpdate = currentSegData[pz];
+            if (!sliceToUpdate) continue;
+            
+            // Get proper 2D index within the slice
             const index = py * width + px;
-            currentSliceData[index] = tool === 'brush' ? 1 : 0;
+            
+            // Apply brush or eraser
+            sliceToUpdate[index] = tool === 'brush' ? 1 : 0;
           }
         }
       }
     }
     
-    // Update current slice
-    currentSegData[voxelZ] = currentSliceData;
     setSegmentationData(currentSegData);
     
     // Render the updated canvas
     renderCanvas(sliceIndex, imageData, currentSegData);
+  };
+
+  // Toggle image flip
+  const toggleFlip = () => {
+    setFlipped(!flipped);
   };
 
   // Handle slice navigation
@@ -350,6 +570,12 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
     const bounded = Math.max(0, Math.min(newSlice, maxSlices - 1));
     setSliceIndex(bounded);
     renderCanvas(bounded);
+  };
+
+  // Change view orientation
+  const changeView = (newView: ViewType) => {
+    setCurrentView(newView);
+    // The useEffect will handle updating maxSlices and re-rendering
   };
 
   // Adjust window/level
@@ -378,7 +604,9 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
       screenshot: screenshot,
       originalImageData: imageData?.pixelData,
       windowWidth: windowWidth,
-      windowCenter: windowCenter
+      windowCenter: windowCenter,
+      viewType: currentView, // Include the current view type
+      flipped: flipped // Include the flip state
     });
   };
 
@@ -455,6 +683,62 @@ export function ManualSegmentation({ file, onComplete, onCancel }: ManualSegment
                 />
                 <span className="text-blue-800 w-8">{brushSize}px</span>
               </div>
+            </div>
+            
+            {/* View selection controls and flip toggle */}
+            <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex bg-gray-100 rounded-full p-1">
+                <button
+                  onClick={() => changeView('axial')}
+                  className={`flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
+                    ${currentView === 'axial' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-700 hover:bg-gray-200'
+                    }`}
+                  title="Axial View"
+                >
+                  <AlignJustify size={16} />
+                  <span className="text-sm whitespace-nowrap">Axial</span>
+                </button>
+                <button
+                  onClick={() => changeView('coronal')}
+                  className={`flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
+                    ${currentView === 'coronal' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-700 hover:bg-gray-200'
+                    }`}
+                  title="Coronal View"
+                >
+                  <Columns size={16} />
+                  <span className="text-sm whitespace-nowrap">Coronal</span>
+                </button>
+                <button
+                  onClick={() => changeView('sagittal')}
+                  className={`flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
+                    ${currentView === 'sagittal' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-700 hover:bg-gray-200'
+                    }`}
+                  title="Sagittal View"
+                >
+                  <LayoutTemplate size={16} />
+                  <span className="text-sm whitespace-nowrap">Sagittal</span>
+                </button>
+              </div>
+              
+              {/* Flip toggle button */}
+              <button
+                onClick={toggleFlip}
+                className={`flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
+                  ${flipped
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                title="Flip Image Vertically"
+              >
+                <FlipVertical size={16} />
+                <span className="text-sm whitespace-nowrap">Flip</span>
+              </button>
             </div>
             
             <div className="flex flex-wrap items-center gap-2">

@@ -8,23 +8,27 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# NNUNet paths
+# NNUNet paths - updated to match the working run_inference.py
 NNUNET_BASE = os.path.join(BASE_DIR, 'models', 'nnunet')
-
-# Define paths for nnU-Net
 NNUNET_RAW = os.path.join(NNUNET_BASE, 'nnUNet_raw')
 NNUNET_PREPROCESSED = os.path.join(NNUNET_BASE, 'nnUNet_preprocessed')
+# Point directly to the nnUNet_results folder, not the base folder
 NNUNET_RESULTS = os.path.join(NNUNET_BASE, 'nnUNet_results')
+
+# Define paths for I/O
+NNUNET_INPUT_DIR = os.path.join(BASE_DIR, 'models', 'input_dir')
+NNUNET_OUTPUT_DIR = os.path.join(BASE_DIR, 'models', 'output_dir')
 SEGMENTATION_RESULTS_PATH = os.path.join(BASE_DIR, 'media', 'segmentations')
 LOG_DIR = BASE_DIR / 'logs'
 os.makedirs(LOG_DIR, exist_ok=True)
+
 # Create directories if they don't exist
 os.makedirs(NNUNET_RAW, exist_ok=True)
 os.makedirs(NNUNET_PREPROCESSED, exist_ok=True)
 os.makedirs(NNUNET_RESULTS, exist_ok=True)
+os.makedirs(NNUNET_INPUT_DIR, exist_ok=True)
+os.makedirs(NNUNET_OUTPUT_DIR, exist_ok=True)
 os.makedirs(SEGMENTATION_RESULTS_PATH, exist_ok=True)
-
-NNUNET_MODEL_PATH = NNUNET_RESULTS
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-dev-key-change-in-production')

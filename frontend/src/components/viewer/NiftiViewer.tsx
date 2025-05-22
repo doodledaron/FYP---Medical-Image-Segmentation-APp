@@ -6,7 +6,7 @@ import { Layers, Columns, AlignJustify, LayoutTemplate, Loader2, Eye, EyeOff, Ac
 // Import pako without ts-ignore and use the correct methods
 import pako from "pako";
 import axios from "axios";
-import { ManualSegmentationViewer } from './ManualSegmentationViewer';
+import { ManualSegmentationViewer, ViewType } from './ManualSegmentationViewer';
 
 interface NiftiViewerProps {
   file: File;
@@ -18,6 +18,8 @@ interface NiftiViewerProps {
     originalImageData?: Float32Array;
     windowWidth?: number;
     windowCenter?: number;
+    viewType?: ViewType;
+    flipped?: boolean;
   } | null;
   showManualSegmentationPreview?: boolean;
   setShowManualSegmentationPreview?: (show: boolean) => void;
@@ -151,6 +153,19 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({
   const fetchAndCompressRemoteFile = async (url: string, filename: string) => {
     try {
       console.log(`Fetching remote file from ${url}`);
+      
+      // Check if the URL starts with http or https
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        console.log("Using relative URL path:", url);
+        // For mock data, assume files are in public directory
+        if (url.startsWith('/')) {
+          // This is a relative URL path - no need to compress, 
+          // as we assume these files are properly formatted in the public directory
+          console.log("Using public directory file:", url);
+          return url;
+        }
+      }
+      
       const response = await axios.get(url, { responseType: 'arraybuffer' });
       const fileData = response.data;
 
@@ -167,6 +182,19 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({
       }
     } catch (error) {
       console.error("Error fetching or compressing remote file:", error);
+      
+      // Extra logging to diagnose the issue
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          console.error("Error response:", error.response.status, error.response.statusText);
+        } else if (error.request) {
+          console.error("No response received. Check if the URL is accessible:", url);
+        } else {
+          console.error("Error setting up request:", error.message);
+        }
+      }
+      
+      // For mock data or local files that might fail with Axios, return the URL directly
       return url; // Fall back to original URL on error
     }
   };
@@ -246,109 +274,105 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({
       <div className={`flex ${showManualSegmentationPreview ? 'flex-row gap-4' : 'flex-col'}`}>
         {/* NiftiViewer canvas container - adjusted width when side-by-side */}
         <div className={`relative ${showManualSegmentationPreview ? 'w-1/2' : 'w-full'} h-[calc(100vh-150px)] min-h-[700px]`}>
-          {/* Control panel - Top right */}
-          <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-            {/* Manual Segmentation Preview Toggle - only show if we have manual segmentation data */}
-            {hasManualSegmentation && (
-              <div className="bg-black/30 p-2 rounded-lg">
-                <div className="text-xs text-white font-semibold mb-1">Manual Segmentation</div>
+          {/* Controls Bar - top right, modern style */}
+          <div className="absolute top-4 right-4 z-10">
+
+            
+            {/* Control Buttons */}
+            <div className="flex bg-white rounded-full shadow-sm p-1">
+              {/* Manual Segmentation Preview Toggle - only show if we have manual segmentation data */}
+              {hasManualSegmentation && (
                 <button
                   onClick={() => setShowManualSegmentationPreview(!showManualSegmentationPreview)}
                   className={`
-                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
+                    flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
                     ${showManualSegmentationPreview
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
                     }
                   `}
+                  title={showManualSegmentationPreview ? "Hide Manual Segmentation" : "Show Manual Segmentation"}
                 >
-                  {showManualSegmentationPreview ? (
-                    <>
-                      <EyeOff size={14} />
-                      Hide Manual
-                    </>
-                  ) : (
-                    <>
-                      <Eye size={14} />
-                      Show Manual
-                    </>
-                  )}
+                  {showManualSegmentationPreview ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <span className="text-sm whitespace-nowrap">
+                    {showManualSegmentationPreview ? "Hide Manual Segmentation" : "View Manual Segmentation"}
+                  </span>
                 </button>
-              </div>
-            )}
+              )}
 
-            {/* Segmentation Type Toggle */}
-            {segmentationResult?.lungSegmentationUrl && (
-              <div className="bg-black/30 p-2 rounded-lg">
-                <div className="text-xs text-white font-semibold mb-1">Segmentation</div>
+              {/* Lung Segmentation Toggle */}
+              {segmentationResult?.lungSegmentationUrl && (
                 <button
                   onClick={toggleLungSegmentation}
                   disabled={isLoading}
                   className={`
-                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors mb-2
+                    flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
                     ${showLungSegmentation
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
                     }
                     ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                   `}
+                  title={showLungSegmentation ? "Hide Lung Segmentation" : "Show Lung Segmentation"}
                 >
-                  <Activity size={14} />
-                  {showLungSegmentation ? 'Hide Lung' : 'Show Lung'}
+                  <Activity size={16} />
+                  <span className="text-sm whitespace-nowrap">
+                    {showLungSegmentation ? "Hide Lung" : "View Lung"}
+                  </span>
                 </button>
-              </div>
-            )}
-
-            {/* Slice view toggle */}
-            <div className="bg-black/30 p-2 rounded-lg">
-              <div className="text-xs text-white font-semibold mb-1">Slice View</div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSliceView('axial')}
-                  disabled={isLoading}
-                  className={`
-                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
-                    ${sliceView === 'axial'
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
-                    }
-                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
-                >
-                  <AlignJustify size={14} />
-                  Axial
-                </button>
-                <button
-                  onClick={() => setSliceView('coronal')}
-                  disabled={isLoading}
-                  className={`
-                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
-                    ${sliceView === 'coronal'
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
-                    }
-                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
-                >
-                  <Columns size={14} />
-                  Coronal
-                </button>
-                <button
-                  onClick={() => setSliceView('sagittal')}
-                  disabled={isLoading}
-                  className={`
-                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
-                    ${sliceView === 'sagittal'
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
-                    }
-                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
-                >
-                  <LayoutTemplate size={14} />
-                  Sagittal
-                </button>
-              </div>
+              )}
+            </div>
+            
+            {/* View Controls */}
+            <div className="mt-3 flex bg-white rounded-full shadow-sm p-1">
+              <button
+                onClick={() => setSliceView('axial')}
+                disabled={isLoading}
+                className={`
+                  flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
+                  ${sliceView === 'axial'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                  ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                title="Axial View"
+              >
+                <AlignJustify size={16} />
+                <span className="text-sm whitespace-nowrap">Axial View</span>
+              </button>
+              <button
+                onClick={() => setSliceView('coronal')}
+                disabled={isLoading}
+                className={`
+                  flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
+                  ${sliceView === 'coronal'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                  ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                title="Coronal View"
+              >
+                <Columns size={16} />
+                <span className="text-sm whitespace-nowrap">Coronal View</span>
+              </button>
+              <button
+                onClick={() => setSliceView('sagittal')}
+                disabled={isLoading}
+                className={`
+                  flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
+                  ${sliceView === 'sagittal'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                  ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                title="Sagittal View"
+              >
+                <LayoutTemplate size={16} />
+                <span className="text-sm whitespace-nowrap">Sagittal View</span>
+              </button>
             </div>
           </div>
 
@@ -359,12 +383,12 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({
             className="w-full h-full rounded-lg"
           ></canvas>
 
-          {/* Loading overlay */}
+          {/* Loading overlay - modernized */}
           {isLoading && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg">
-              <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl flex flex-col items-center gap-3">
-                <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
-                <div className="text-white text-sm font-medium">Loading view...</div>
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center rounded-lg">
+              <div className="bg-white p-4 rounded-xl shadow-md flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+                <div className="text-gray-800 text-sm font-medium">Loading view...</div>
               </div>
             </div>
           )}
@@ -372,7 +396,7 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({
 
         {/* Manual Segmentation Preview - Side panel */}
         {showManualSegmentationPreview && (
-          <div className="w-1/2 h-[calc(100vh-150px)] min-h-[700px] rounded-lg border border-blue-200 flex flex-col">
+          <div className="w-1/2 h-[calc(100vh-150px)] min-h-[700px] rounded-lg shadow-sm bg-white overflow-hidden">
             {manualSegmentationData ? (
               /* If we have full segmentation data, use the interactive viewer */
               <ManualSegmentationViewer
@@ -381,19 +405,21 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({
                 originalImageData={manualSegmentationData.originalImageData}
                 windowWidth={manualSegmentationData.windowWidth}
                 windowCenter={manualSegmentationData.windowCenter}
+                initialViewType={manualSegmentationData.viewType}
+                flipped={manualSegmentationData.flipped}
               />
             ) : manualSegmentationScreenshot ? (
               /* Fallback to screenshot if we only have that */
               <>
-                <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 text-center font-medium rounded-t-lg">
-                  Manual Segmentation Preview
+                <div className="bg-white border-b border-gray-100 text-gray-900 p-3 text-center font-medium">
+                  Manual Segmentation
                 </div>
-                <div className="flex-1 flex items-center justify-center bg-gray-900 rounded-b-lg overflow-hidden">
+                <div className="flex-1 flex items-center justify-center bg-gray-50 overflow-hidden">
                   <div className="relative max-w-full max-h-full p-2">
                     <img
                       src={manualSegmentationScreenshot}
                       alt="Manual Segmentation"
-                      className="max-w-full max-h-[calc(100vh-200px)] object-contain rounded shadow-lg"
+                      className="max-w-full max-h-[calc(100vh-200px)] object-contain rounded shadow-sm"
                     />
                   </div>
                 </div>
