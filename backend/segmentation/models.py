@@ -28,6 +28,13 @@ def segmentation_result_path(instance, filename):
     """Generate file path for segmentation results."""
     return os.path.join('segmentations', f"seg_{instance.id}.nii.gz")
 
+def tumor_segmentation_path(instance, filename):
+    """Generate file path for tumor segmentation results."""
+    return os.path.join('segmentations', f"tumor_seg_{instance.id}.nii.gz")
+
+def lung_segmentation_path(instance, filename):
+    """Generate file path for lung segmentation results."""
+    return os.path.join('segmentations', f"lung_seg_{instance.id}.nii.gz")
 
 class SegmentationTask(models.Model):
     """Model for tracking lung image segmentation tasks."""
@@ -43,19 +50,20 @@ class SegmentationTask(models.Model):
                                        related_name='segmentation_tasks')
     file_name      = models.CharField(max_length=255)
     nifti_file     = models.FileField(upload_to=nifti_file_path)
-    # preview_file   = models.FileField(upload_to=preview_file_path,
-    #                                   max_length=255, null=True, blank=True,
-    #                                   help_text="Downsampled NIfTI preview for fast viewing")
     status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued')
-    result_file    = models.FileField(upload_to=segmentation_result_path,
+    tumor_segmentation = models.FileField(upload_to=tumor_segmentation_path,
+                                      max_length=255, null=True, blank=True)
+    lung_segmentation = models.FileField(upload_to=lung_segmentation_path,
                                       max_length=255, null=True, blank=True)
     error          = models.TextField(null=True, blank=True)
     created_at     = models.DateTimeField(auto_now_add=True)
     updated_at     = models.DateTimeField(auto_now=True)
     # Metrics
-    lesion_volume    = models.FloatField(null=True, blank=True,
-                                         help_text="Total lesion volume in cubic centimeters")
-    lesion_count     = models.IntegerField(null=True, blank=True,
+    tumor_volume    = models.FloatField(null=True, blank=True,
+                                         help_text="Total tumor volume in cubic centimeters")
+    lung_volume     = models.FloatField(null=True, blank=True,
+                                         help_text="Total lung volume in cubic centimeters")
+    lesion_count    = models.IntegerField(null=True, blank=True,
                                            help_text="Number of distinct lesions")
     confidence_score = models.FloatField(null=True, blank=True,
                                          help_text="Model confidence score (0–1)")

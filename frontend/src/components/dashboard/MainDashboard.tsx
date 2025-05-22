@@ -1,10 +1,13 @@
 // src/components/dashboard/MainDashboard.tsx
 import React, { useState, useEffect } from 'react';
-import { Brain, Eye, Loader2, MousePointer2, Maximize, RotateCcw, FileSymlink, Settings } from 'lucide-react';
+import { Brain, Eye, Loader2, MousePointer2, Maximize, RotateCcw, FileSymlink, Settings, Layers, Check, CheckSquare, Square, BookOpen } from 'lucide-react';
 import { FileUpload } from '../common/FileUpload';
 import { Viewer3D } from '../viewer/Viewer3D';
 import NiftiViewer from '../viewer/NiftiViewer';
+import { SegmentationChoiceModal } from '../common/SegmentationChoiceModal';
+import { ManualSegmentation } from '../viewer/ManualSegmentation';
 import axios from 'axios';
+import { ManualSegmentationViewer } from '../viewer/ManualSegmentationViewer';
 
 interface MainDashboardProps {
   file: File | null;
@@ -13,7 +16,63 @@ interface MainDashboardProps {
   show3D: boolean;
   setShow3D: (show: boolean) => void;
   handleFileSelect: (file: File) => void;
+  showSegmentationChoice: boolean;
+  handleSegmentationChoice: (mode: "manual" | "ai") => void;
+  showManualSegmentation: boolean;
+  completeManualSegmentation: (segData: any) => void;
 }
+
+// TNM Fun Facts for loading screen
+const tnmFunFacts = [
+  {
+    title: "TNM Basics",
+    fact: "The 'p' prefix in TNM staging indicates pathologic stage based on surgical resection only."
+  },
+  {
+    title: "TNM System",
+    fact: "The TNM system for lung cancer does not apply to pulmonary sarcomas."
+  },
+  {
+    title: "TNM Classification",
+    fact: "The 9th edition of TNM classification was issued by the International Association for the Study of Lung Cancer (IASLC)."
+  },
+  {
+    title: "TNM Purpose",
+    fact: "The primary purpose of TNM is to standardize anatomical extent for communication and data applicability."
+  },
+  {
+    title: "Subsolid Lesions",
+    fact: "Pure ground glass lesions ≤ 30 mm are classified as at most cTis."
+  },
+  {
+    title: "CT Reconstruction",
+    fact: "Subsolid lesion measurements should be obtained on CT reconstructions with slice thickness of < 1.5 mm."
+  },
+  {
+    title: "T-Staging",
+    fact: "A tumor measuring between 1-2 cm is classified as T1b."
+  },
+  {
+    title: "T3 Classification",
+    fact: "A tumor > 5 cm but ≤ 7 cm is classified as T3."
+  },
+  {
+    title: "N-Staging",
+    fact: "Metastasis to a single ipsilateral mediastinal station is classified as N2a."
+  },
+  {
+    title: "PET-CT Usage",
+    fact: "PET-CT has a high negative predictive value for nodal staging."
+  },
+  {
+    title: "M-Staging",
+    fact: "M1a disease includes malignant pleural effusion."
+  },
+  {
+    title: "Metastasis Classification",
+    fact: "A solitary liver metastasis is classified as M1b."
+  }
+];
 
 export const MainDashboard: React.FC<MainDashboardProps> = ({
   file,
@@ -21,15 +80,36 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   segmentationResult,
   show3D,
   setShow3D,
-  handleFileSelect
+  handleFileSelect,
+  showSegmentationChoice,
+  handleSegmentationChoice,
+  showManualSegmentation,
+  completeManualSegmentation
 }) => {
   // key to force remount of Viewer3D (simulates hot-reload)
   const [reloadKey, setReloadKey] = useState(0);
   const [colormapKey, setColormapKey] = useState('gray');
-  const [showLungOnly, setShowLungOnly] = useState(false);
-  const [hasClickedViewButton, setHasClickedViewButton] = useState(false);
-  const [showUploadSection, setShowUploadSection] = useState(!file);
-
+  
+  // New visibility state for each component
+  const [showBody, setShowBody] = useState(true);
+  const [showLung, setShowLung] = useState(false);
+  const [showTumour, setShowTumour] = useState(true);
+  
+  // For fun fact rotation
+  const [currentFactIndex, setCurrentFactIndex] = useState(0);
+  
+  // Add state for manual segmentation data
+  const [manualSegmentationData, setManualSegmentationData] = useState<{
+    segmentationMask: Uint8Array[];
+    dimensions: [number, number, number];
+    screenshot: string | null;
+    originalImageData?: Float32Array;
+    windowWidth?: number;
+    windowCenter?: number;
+  } | null>(null);
+  
+  const [showManualSegmentationPreview, setShowManualSegmentationPreview] = useState(false);
+  
   // Enhanced preset list with icons and descriptions
   const presets = [
     { key: 'gray', label: 'Gray', description: 'Standard grayscale view' },
@@ -38,6 +118,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   ];
 
   // Effect to handle fade-in for upload section
+  const [showUploadSection, setShowUploadSection] = useState(!file);
   useEffect(() => {
     if (!file) {
       const timer = setTimeout(() => setShowUploadSection(true), 50);
@@ -47,10 +128,42 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
     }
   }, [file]);
 
+  // Rotate fun facts every 5 seconds during loading
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setCurrentFactIndex((prevIndex) => (prevIndex + 1) % tnmFunFacts.length);
+      }, 5000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [loading]);
+
+  // Function to update view settings and reload viewer
+  const updateView = () => {
+    setReloadKey((k) => k + 1);
+  };
+
+  // Handle completing manual segmentation
+  const handleCompleteManualSegmentation = (segData: any) => {
+    // Save all segmentation data, not just the screenshot
+    setManualSegmentationData({
+      segmentationMask: segData.segmentationMask,
+      dimensions: segData.dimensions,
+      screenshot: segData.screenshot,
+      originalImageData: segData.originalImageData,
+      windowWidth: segData.windowWidth,
+      windowCenter: segData.windowCenter
+    });
+    
+    // Pass the data to the parent component
+    completeManualSegmentation(segData);
+  };
+
   return (
-    <div className="max-w-6xl mx-auto py-12 px-4 sm:px-6 lg:px-8 space-y-8">
+    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Enhanced Header with Stronger Visual Presence */}
-      <div className="text-center mb-16 relative">
+      <div className="text-center mb-12 relative">
         {/* Background gradient circle for visual interest */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-48 h-48 bg-gradient-to-br from-blue-400/20 to-indigo-500/20 rounded-full blur-xl"></div>
@@ -58,24 +171,41 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         
         {/* Logo and title with enhanced animations */}
         <div className="relative">
-          <div className="flex items-center justify-center mb-8">
+          <div className="flex items-center justify-center mb-6">
             <div className="transform transition-all duration-700 hover:rotate-12 hover:scale-110 bg-gradient-to-br from-blue-500 to-indigo-600 p-5 rounded-2xl shadow-lg">
-              <Brain className="h-16 w-16 text-white animate-[pulse_3s_ease-in-out_infinite]" />
+              <Brain className="h-14 w-14 text-white animate-[pulse_3s_ease-in-out_infinite]" />
             </div>
           </div>
           
-          <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-800 mb-6 opacity-0 animate-[slideDown_0.8s_ease-out_0.5s_forwards]">
+          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-800 mb-4 opacity-0 animate-[slideDown_0.8s_ease-out_0.5s_forwards]">
             MedLearn AI
           </h1>
           
-          <p className="text-blue-600 text-xl max-w-2xl mx-auto opacity-0 animate-[slideUp_0.8s_ease-out_0.8s_forwards]">
+          <p className="text-blue-600 text-lg max-w-2xl mx-auto opacity-0 animate-[slideUp_0.8s_ease-out_0.8s_forwards]">
             Advanced medical imaging analysis powered by artificial intelligence
           </p>
         </div>
       </div>
 
+      {/* Segmentation Choice Modal */}
+      {showSegmentationChoice && file && (
+        <SegmentationChoiceModal 
+          onSelectMode={handleSegmentationChoice}
+          fileName={file.name}
+        />
+      )}
+
+      {/* Manual Segmentation View */}
+      {showManualSegmentation && file && (
+        <ManualSegmentation
+          file={file}
+          onComplete={handleCompleteManualSegmentation}
+          onCancel={() => handleFileSelect(null as any)}
+        />
+      )}
+
       {/* Main Content Area with Card-Based Layout */}
-      <div className="grid gap-8">
+      <div className={`grid gap-8 ${showManualSegmentation ? 'hidden' : ''}`}>
         {/* File Upload Section with Enhanced Animation */}
         {!file && (
           <div
@@ -102,7 +232,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         )}
 
         {/* File Info with Enhanced Design */}
-        {file && !loading && (
+        {file && !loading && !showSegmentationChoice && (
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-blue-100 transition-all duration-300 hover:shadow-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -126,22 +256,36 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
         )}
 
-        {/* Loading State with Enhanced Visual Feedback */}
+        {/* Loading State with Fun Facts */}
         {loading && (
           <div className="bg-white rounded-2xl shadow-lg p-10 text-center border border-blue-100">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-24 h-24 bg-blue-100 rounded-full blur-md animate-pulse"></div>
+            <div className="text-blue-900 font-medium text-xl mb-6">Processing your medical scan...</div>
+            
+            {/* Enhanced Fun Fact Card */}
+            <div className="max-w-2xl mx-auto bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100 transition-all animate-[fadeIn_0.5s_ease-in]">
+              <div className="flex items-center gap-2 mb-3">
+                <BookOpen className="h-6 w-6 text-blue-600" />
+                <h3 className="font-semibold text-blue-800 text-lg">
+                  TNM Fun Fact: {tnmFunFacts[currentFactIndex].title}
+                </h3>
               </div>
-              <Loader2 className="animate-spin h-16 w-16 mx-auto text-blue-600 mb-6 relative" />
+              <p className="text-blue-700 text-base font-medium">
+                {tnmFunFacts[currentFactIndex].fact}
+              </p>
+              <div className="flex justify-center gap-1 mt-5">
+                {tnmFunFacts.map((_, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`h-2 w-10 rounded-full transition-all duration-300 ${idx === currentFactIndex ? 'bg-blue-600' : 'bg-blue-200'}`}
+                  ></div>
+                ))}
+              </div>
             </div>
-            <p className="text-blue-900 font-medium text-xl mb-2">Processing your medical scan...</p>
-            <p className="text-blue-600 max-w-md mx-auto">Our AI is analyzing your data. This may take a few moments depending on the file size.</p>
           </div>
         )}
 
         {/* Results Section with Improved Organization */}
-        {file && segmentationResult && !loading && (
+        {file && segmentationResult && !loading && !showSegmentationChoice && (
           <div className="bg-white rounded-2xl shadow-lg p-8 border border-blue-100">
             {/* Header with Clear Visual Hierarchy */}
             <div className="flex justify-between items-center mb-8 pb-6 border-b border-blue-100">
@@ -150,7 +294,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 <p className="text-blue-600">Interactive visualization with AI-powered segmentation</p>
               </div>
               <button
-                onClick={() => setShow3D(!show3D)}
+                onClick={() => {
+                  if (!show3D) {
+                    // When first toggling to 3D view, ensure both lung and tumour are shown
+                    setShowLung(true);
+                    setShowTumour(true);
+                  }
+                  setShow3D(!show3D);
+                }}
                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg"
               >
                 <Eye className="h-5 w-5" />
@@ -166,59 +317,97 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                   Visualization Settings
                 </h3>
                 
-                <div className="flex flex-wrap gap-3">
-                  {/* Conditionally render presets with improved design */}
-                  {hasClickedViewButton && (
-                    <div className="flex flex-wrap gap-3 mr-4">
-                      {presets.map((p) => (
-                        <button
-                          key={p.key}
+                <div className="flex flex-col gap-4">
+                  {/* View Mode Selection - New Checkbox Style */}
+                  <div>
+                    <div className="flex items-center font-medium text-blue-700 mb-3">
+                      <Layers className="h-4 w-4 mr-1" /> View Components:
+                    </div>
+                    <div className="flex flex-wrap gap-4">
+                      {/* Body Checkbox */}
+                      <label 
+                        className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div 
+                          className="w-5 h-5 flex items-center justify-center rounded border border-gray-300"
                           onClick={() => {
-                            setColormapKey(p.key);
-                            setReloadKey((k) => k + 1);
+                            setShowBody(!showBody);
+                            updateView();
                           }}
-                          className={`
-                            px-5 py-2 rounded-lg transition-all flex items-center
-                            ${colormapKey === p.key
-                              ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md'
-                              : 'bg-white text-gray-800 hover:bg-gray-100 border border-gray-200'}
-                          `}
-                          title={p.description}
                         >
-                          {p.label}
-                        </button>
-                      ))}
+                          {showBody ? (
+                            <Check className="h-4 w-4 text-blue-600" />
+                          ) : null}
+                        </div>
+                        <span className="text-gray-800">Body</span>
+                      </label>
+                      
+                      {/* Lung Checkbox */}
+                      <label 
+                        className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div 
+                          className="w-5 h-5 flex items-center justify-center rounded border border-gray-300"
+                          onClick={() => {
+                            setShowLung(!showLung);
+                            updateView();
+                          }}
+                        >
+                          {showLung ? (
+                            <Check className="h-4 w-4 text-blue-600" />
+                          ) : null}
+                        </div>
+                        <span className="text-gray-800">Lung</span>
+                      </label>
+                      
+                      {/* Tumour Checkbox */}
+                      <label 
+                        className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div 
+                          className="w-5 h-5 flex items-center justify-center rounded border border-gray-300"
+                          onClick={() => {
+                            setShowTumour(!showTumour);
+                            updateView();
+                          }}
+                        >
+                          {showTumour ? (
+                            <Check className="h-4 w-4 text-blue-600" />
+                          ) : null}
+                        </div>
+                        <span className="text-gray-800">Tumour</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {/* Conditionally render presets only if Body is visible */}
+                  {showBody && (
+                    <div className="mt-2">
+                      <div className="flex items-center font-medium text-blue-700 mb-2">
+                        <Settings className="h-4 w-4 mr-1" /> Body Visualization:
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {presets.map((p) => (
+                          <button
+                            key={p.key}
+                            onClick={() => {
+                              setColormapKey(p.key);
+                              updateView();
+                            }}
+                            className={`
+                              px-4 py-2 rounded-lg transition-all flex items-center
+                              ${colormapKey === p.key
+                                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md'
+                                : 'bg-white text-gray-800 hover:bg-gray-100 border border-gray-200'}
+                            `}
+                            title={p.description}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
-                  
-                  {/* Toggle button with improved design */}
-                  <button
-                    onClick={() => {
-                      if (!hasClickedViewButton) {
-                        setHasClickedViewButton(true);
-                        setShowLungOnly(false);
-                      } else {
-                        setShowLungOnly((prev) => !prev);
-                      }
-                      setReloadKey((k) => k + 1);
-                    }}
-                    className={`
-                      px-5 py-2 rounded-lg transition-all flex items-center
-                      ${!hasClickedViewButton 
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : showLungOnly
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      }
-                    `}
-                  >
-                    {!hasClickedViewButton
-                      ? 'View Tumour and Lung'
-                      : showLungOnly
-                        ? 'View Tumour and Lung'
-                        : 'View Lung Only'
-                    }
-                  </button>
                 </div>
               </div>
             )}
@@ -242,7 +431,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                   segmentationData={segmentationResult}
                   reloadKey={reloadKey}
                   colormapKey={colormapKey}
-                  showLungOnly={showLungOnly}
+                  showBody={showBody}
+                  showLung={showLung}
+                  showTumour={showTumour}
+                  manualSegmentationData={manualSegmentationData}
+                  showManualSegmentationPreview={showManualSegmentationPreview}
+                  setShowManualSegmentationPreview={setShowManualSegmentationPreview}
                 />
               </div>
             </div>
@@ -251,39 +445,124 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <div className={!show3D ? 'block' : 'hidden'}>
               <div className="space-y-6">
                 <div className="rounded-xl overflow-hidden shadow-lg border border-blue-100">
-                  <NiftiViewer file={file} segmentationResult={segmentationResult} />
+                  <NiftiViewer 
+                    file={file} 
+                    segmentationResult={segmentationResult} 
+                    manualSegmentationData={manualSegmentationData}
+                    showManualSegmentationPreview={showManualSegmentationPreview}
+                    setShowManualSegmentationPreview={setShowManualSegmentationPreview}
+                  />
                 </div>
                 {/* Summary section is moved out from here */}
               </div>
             </div>
 
-            {/* AI Analysis Summary (Moved outside the 2D/3D toggle divs) */}
+            {/* Analysis Summary (Moved outside the 2D/3D toggle divs) */}
             <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
-              <h4 className="font-medium text-blue-900 mb-4 text-lg">AI Analysis Summary</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <p className="text-sm text-blue-600 mb-1">Lesion Volume</p>
-                  <p className="text-2xl font-bold text-blue-900">
-                    {segmentationResult.metrics?.lesionVolume || 'N/A'} cm³
-                  </p>
+              <h4 className="font-medium text-blue-900 mb-4 text-lg">Analysis Summary</h4>
+              
+              {/* Metrics Cards - Consistent styling */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col justify-between h-full">
+                  <p className="text-sm text-blue-600 mb-1 font-medium">Tumor Volume</p>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {segmentationResult.metrics?.tumorVolume || 'N/A'} cm³
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <p className="text-sm text-blue-600 mb-1">Lesion Count</p>
-                  <p className="text-2xl font-bold text-blue-900">
-                    {segmentationResult.metrics?.lesionCount || 'N/A'}
-                  </p>
+                <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col justify-between h-full">
+                  <p className="text-sm text-blue-600 mb-1 font-medium">Lung Volume</p>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {segmentationResult.metrics?.lungVolume || 'N/A'} cm³
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <p className="text-sm text-blue-600 mb-1">Confidence Score</p>
-                  <p className="text-2xl font-bold text-blue-900">
-                    {segmentationResult.metrics?.confidenceScore
-                      ? `${(segmentationResult.metrics.confidenceScore * 100).toFixed(0)}%`
-                      : 'N/A'}
-                  </p>
+                <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col justify-between h-full">
+                  <p className="text-sm text-blue-600 mb-1 font-medium">Lesion Count</p>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {segmentationResult.metrics?.lesionCount || 'N/A'}
+                    </p>
+                  </div>
                 </div>
               </div>
+              
+              {/* Unified Summary Section */}
+              {segmentationResult.metrics?.tumorVolume && segmentationResult.metrics?.lungVolume && (
+                <div className="bg-white rounded-lg border border-blue-100 overflow-hidden">
+                  {/* Summary sentence - updated with better styling */}
+                  <div className="p-4 border-b border-blue-100 transition-all duration-300 ease-in-out hover:bg-blue-50 cursor-default hover:shadow-inner">
+                    <p className="text-blue-800 font-medium text-lg leading-relaxed">
+                      {(() => {
+                        const tumorVolume = segmentationResult.metrics.tumorVolume;
+                        const lungVolume = segmentationResult.metrics.lungVolume;
+                        const lesionCount = segmentationResult.metrics.lesionCount || 1;
+                        const percentage = (tumorVolume / lungVolume * 100).toFixed(2);
+                        const avgSize = (tumorVolume / lesionCount).toFixed(2);
+                        
+                        const severityClass = parseFloat(percentage) < 1 
+                          ? "text-green-700 font-semibold" 
+                          : parseFloat(percentage) < 5 
+                            ? "text-yellow-700 font-semibold" 
+                            : "text-red-700 font-semibold";
+                        
+                        if (parseFloat(percentage) < 1) {
+                          return (
+                            <>
+                              Analysis shows <span className={severityClass}>minimal tumor burden</span> ({percentage}% of lung volume) with {lesionCount} lesion(s) averaging {avgSize} cm³ each.
+                            </>
+                          );
+                        } else if (parseFloat(percentage) < 5) {
+                          return (
+                            <>
+                              Analysis shows <span className={severityClass}>moderate tumor burden</span> ({percentage}% of lung volume) with {lesionCount} lesion(s) averaging {avgSize} cm³ each.
+                            </>
+                          );
+                        } else {
+                          return (
+                            <>
+                              Analysis shows <span className={severityClass}>significant tumor burden</span> ({percentage}% of lung volume) with {lesionCount} lesion(s) averaging {avgSize} cm³ each.
+                            </>
+                          );
+                        }
+                      })()}
+                    </p>
+                  </div>
+                  
+                  {/* Tumor Burden Classification Explanation - updated styling */}
+                  <div className="p-4 bg-gray-50">
+                    <p className="text-sm text-blue-700 font-medium mb-3">Tumor Burden Classification</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="bg-white p-3 rounded border border-green-100 h-full">
+                        <div className="flex items-center mb-1.5">
+                          <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                          <span className="font-semibold text-sm text-green-800">Minimal (&lt;1%)</span>
+                        </div>
+                        <p className="text-xs text-green-700">Small tumor volume relative to lung size; often early-stage and more favorable for treatment.</p>
+                      </div>
+                      <div className="bg-white p-3 rounded border border-yellow-100 h-full">
+                        <div className="flex items-center mb-1.5">
+                          <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                          <span className="font-semibold text-sm text-yellow-800">Moderate (1-5%)</span>
+                        </div>
+                        <p className="text-xs text-yellow-700">Intermediate tumor volume; may indicate progression beyond early stage or multiple lesions.</p>
+                      </div>
+                      <div className="bg-white p-3 rounded border border-red-100 h-full">
+                        <div className="flex items-center mb-1.5">
+                          <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                          <span className="font-semibold text-sm text-red-800">Significant (&gt;5%)</span>
+                        </div>
+                        <p className="text-xs text-red-700">Large tumor volume relative to lung size; often associated with advanced disease and complex treatment needs.</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 italic mt-3">Note: This classification is for educational purposes only. Clinical staging requires expert assessment of multiple factors.</p>
+                  </div>
+                </div>
+              )}
             </div>
-            {/* End of moved AI Analysis Summary */}
+            {/* End of moved Analysis Summary */}
 
           </div>
         )}
@@ -291,32 +570,34 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         {/* Informational Section with Card-Based Layout */}
         {!file && !loading && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100">
-            <h3 className="text-xl font-bold text-blue-900 mb-4">About NIFTI Medical Image Analysis</h3>
-            <p className="text-blue-700 mb-6">
-              Our platform provides advanced visualization and AI-driven analysis for neuroimaging data in NIFTI format (.nii, .nii.gz).
-            </p>
+            <h3 className="text-xl font-bold text-blue-900 mb-4">Learning Through Doing: TNM Staging</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-xl shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
                 <div className="bg-blue-100 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
                   <FileSymlink className="h-6 w-6 text-blue-600" />
                 </div>
-                <h4 className="font-medium text-blue-900 mb-2 text-lg">Upload</h4>
-                <p className="text-blue-600">Upload your NIFTI-formatted medical images for analysis</p>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-                <div className="bg-blue-100 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
-                  <Eye className="h-6 w-6 text-blue-600" />
-                </div>
-                <h4 className="font-medium text-blue-900 mb-2 text-lg">Visualize</h4>
-                <p className="text-blue-600">Interactive 2D and 3D visualization with multiple views</p>
+                <h4 className="font-medium text-blue-900 mb-2 text-lg">Try nnUnet Model</h4>
+                <p className="text-blue-600">Learn segmentation by analyzing real medical images</p>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
                 <div className="bg-blue-100 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
                   <Brain className="h-6 w-6 text-blue-600" />
                 </div>
-                <h4 className="font-medium text-blue-900 mb-2 text-lg">Analyze</h4>
-                <p className="text-blue-600">AI-powered segmentation and analysis</p>
+                <h4 className="font-medium text-blue-900 mb-2 text-lg">Take TNM Quizzes</h4>
+                <p className="text-blue-600">Test and expand your tumor staging knowledge</p>
               </div>
+              <div className="bg-white p-6 rounded-xl shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                <div className="bg-blue-100 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                  <Eye className="h-6 w-6 text-blue-600" />
+                </div>
+                <h4 className="font-medium text-blue-900 mb-2 text-lg">Track Progress</h4>
+                <p className="text-blue-600">Build expertise through hands-on experimentation</p>
+              </div>
+            </div>
+            <div className="bg-white mt-6 p-3 rounded-lg border border-blue-100 text-center">
+              <p className="text-blue-700 text-sm">
+                A constructivist platform for medical students: learn by doing, test your knowledge, master TNM staging
+              </p>
             </div>
           </div>
         )}

@@ -1,77 +1,106 @@
 // useQuizManagement.ts
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Tutorial } from '../types'; // This should match your backend tutorial structure
-import { fetchTutorialDetail } from '../api/learning'; // <-- Corrected import name
+import { fetchTutorialDetail } from '../api/learning';
+import { useTutorialProgress } from './useTutorialProgress';
 
-export function useQuizManagement(initialSelectedTutorial: string | null) { // Renamed prop for clarity
+export function useQuizManagement() {
   const [tutorial, setTutorial] = useState<Tutorial | null>(null);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  
-  const [showQuiz, setShowQuiz] = useState(false);
-  const [showQuizSummary, setShowQuizSummary] = useState(false);
-  const [currentTutorialId, setCurrentTutorialId] = useState<string | null>(initialSelectedTutorial); // Initialize with prop, and this will be the ID to fetch
-  
-  const [quizResults, setQuizResults] = useState<{
-    score: number;
-    totalPoints: number;
-    answers: Record<string, string | string[]>;
-  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { resetProgress, isResetting } = useTutorialProgress();
 
-  // 🔁 Fetch tutorial when currentTutorialId changes
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [currentTutorialId, setCurrentTutorialId] = useState<string | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string | string[]>>({});
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizTotalPoints, setQuizTotalPoints] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   useEffect(() => {
     if (!currentTutorialId) {
-      setTutorial(null); // Clear tutorial data if no ID is selected
+      setTutorial(null);
       return;
     }
-
     setLoading(true);
     setError(null);
-    setTutorial(null); // reset old data first
-
-    fetchTutorialDetail(currentTutorialId) // Use the internal state currentTutorialId for fetching
+    setTutorial(null);
+    fetchTutorialDetail(currentTutorialId)
       .then(setTutorial)
       .catch((err) => setError(err.message ?? 'Failed to load tutorial'))
       .finally(() => setLoading(false));
-  }, [currentTutorialId]); // Depend on the internal state currentTutorialId
+  }, [currentTutorialId, refreshTrigger]);
 
-  // ✅ Handle quiz completion
-  const handleQuizComplete = (
-    tutorialId: string,
-    score: number,
-    totalPoints: number,
-    answers: Record<string, string | string[]>
-  ) => {
-    if (!tutorialId || typeof score !== 'number' || typeof totalPoints !== 'number') {
-      console.error('Invalid quiz data', { tutorialId, score, totalPoints });
-      return;
-    }
-
-    setQuizResults({ score, totalPoints, answers });
-    setShowQuizSummary(true);
+  // Start or reset quiz
+  const startQuiz = (id: string) => {
+    setCurrentTutorialId(id);
+    setShowQuiz(true);
+    setShowSummary(false);
+    setQuizAnswers({});
+    setQuizScore(0);
+    setQuizTotalPoints(0);
   };
 
-  // 🔁 Reset to initial state
+  // Set summary mode
+  const showQuizSummary = () => {
+    setShowSummary(true);
+  };
+
+  // Save quiz results locally and show summary
+  const saveQuizResults = (score: number, totalPoints: number, answers: Record<string, string | string[]>) => {
+    setQuizAnswers(answers);
+    setQuizScore(score);
+    setQuizTotalPoints(totalPoints);
+    showQuizSummary();
+  };
+
+  // Reset quiz state
   const resetQuiz = () => {
     setShowQuiz(false);
-    setShowQuizSummary(false);
-    setCurrentTutorialId(null); // Reset the internal ID
-    setQuizResults(null);
+    setShowSummary(false);
+    setCurrentTutorialId(null);
     setTutorial(null);
     setError(null);
+    setQuizAnswers({});
+    setQuizScore(0);
+    setQuizTotalPoints(0);
   };
+
+  // Reset all progress and refresh tutorial data
+  const resetAllProgress = useCallback(async () => {
+    const success = await resetProgress();
+    if (success) {
+      resetQuiz();
+      // Trigger a refresh by updating the refreshTrigger state
+      setRefreshTrigger(prev => prev + 1);
+      return true;
+    }
+    return false;
+  }, [resetProgress]);
+
+  // Function to manually trigger a refresh
+  const refreshData = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
 
   return {
     showQuiz,
-    setShowQuiz,
+    showSummary,
     showQuizSummary,
-    selectedTutorial: currentTutorialId, // Expose the internal ID state
-    setSelectedTutorial: setCurrentTutorialId, // This setter now correctly triggers the useEffect
-    quizResults,
-    handleQuizComplete,
-    resetQuiz,
     tutorial,
     loading,
     error,
+    selectedTutorial: currentTutorialId,
+    quizAnswers,
+    quizScore,
+    quizTotalPoints,
+    saveQuizResults,
+    startQuiz,
+    resetQuiz,
+    resetAllProgress,
+    isResetting,
+    refreshData,
+    refreshTrigger,
   };
 }

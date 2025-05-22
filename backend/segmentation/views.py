@@ -13,6 +13,7 @@ from django.conf import settings
 import os
 from nibabel.processing import resample_to_output
 import nibabel as nib 
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +42,12 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             status="queued"
         )
 
-        # 2) Down‐sample in place to 2 mm³ voxels
+        # 2) Down‐sample in place to 2 mm³ voxels
         input_path = task.nifti_file.path
         try:
             # Load full‑resolution image
             img = nib.load(input_path)
-            # Resample to 2×2×2 mm voxels
+            # Resample to 2×2×2 mm voxels
             img_ds = resample_to_output(img, voxel_sizes=(1.0,1.0,1.0))
             # Overwrite the original file with the smaller one
             nib.save(img_ds, input_path)
@@ -62,6 +63,20 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
     
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            logger.info(f"Retrieving task with kwargs: {kwargs}")
+            instance = self.get_object()
+            serializer = self.get_serializer(instance, context={'request': request})
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error retrieving task: {e}")
+            logger.error(traceback.format_exc())
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     @action(detail=True, methods=['get'])
     def status(self, request, pk=None):
         """
@@ -69,19 +84,31 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
         """
         try:
             task = self.get_object()
-            # Validate result file URL
-            result_url = None
-            if task.result_file:
-                result_url = task.result_file.url
-                # Check file extension and existence
-                valid_ext = result_url.endswith('.nii') or result_url.endswith('.nii.gz')
-                file_path = os.path.join(settings.MEDIA_ROOT, task.result_file.name)
-                file_exists = os.path.exists(file_path)
-                if not (valid_ext and file_exists):
+            
+            # Check if both segmentation files exist when the task is completed
+            if task.status == 'completed':
+                files_to_check = []
+                
+                if task.tumor_segmentation:
+                    tumor_path = task.tumor_segmentation.path
+                    files_to_check.append(('tumor_segmentation', tumor_path))
+                
+                if task.lung_segmentation:
+                    lung_path = task.lung_segmentation.path
+                    files_to_check.append(('lung_segmentation', lung_path))
+                
+                # Verify files exist
+                missing_files = []
+                for file_type, file_path in files_to_check:
+                    if not os.path.exists(file_path):
+                        missing_files.append(file_type)
+                
+                if missing_files:
                     return Response(
-                        {"error": "Result file is missing or not a valid NIFTI file", "result_file": result_url},
+                        {"error": f"The following segmentation files are missing: {', '.join(missing_files)}"},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
                     )
+            
             # Add context={'request': request} to pass the request to the serializer
             serializer = self.get_serializer(task, context={'request': request})
             return Response(serializer.data)
@@ -89,4 +116,11 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": "Task not found"},
                 status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error in status action: {e}")
+            logger.error(traceback.format_exc())
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

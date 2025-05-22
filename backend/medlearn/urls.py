@@ -5,6 +5,7 @@ from django.conf.urls.static import static
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from segmentation.admin import admin_dashboard
 
 # API Documentation setup
 schema_view = get_schema_view(
@@ -22,6 +23,8 @@ schema_view = get_schema_view(
 urlpatterns = [
     # Admin panel
     path('admin/', admin.site.urls),
+    # Custom admin dashboard
+    path('admin/dashboard/', admin_dashboard, name='admin-dashboard'),
     
     # API endpoints
     path('api/', include('api.urls')),

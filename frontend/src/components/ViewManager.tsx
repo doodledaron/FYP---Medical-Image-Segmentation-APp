@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useTutorialProgress } from '../hooks/useTutorialProgress';
 import { QuizComponent } from './learning/quiz/QuizComponent';
 import TutorialList from './learning/TutorialList';
@@ -7,20 +7,89 @@ import { MainDashboard } from './dashboard/MainDashboard';
 import { useQuizManagement } from '../hooks/useQuizManagement';
 import { useFileProcessing } from '../hooks/useFileProcessing';
 import { useTutorialList } from '../hooks/useTutorialList';
+import { Header } from './layout/Header';
 
-// Props might need adjustment based on hook returns
 interface ViewManagerProps {
-  currentView: string; // Or your ViewType
+  currentView: 'dashboard' | 'tutorials' | 'progress';
+  setCurrentView: (view: 'dashboard' | 'tutorials' | 'progress') => void;
 }
 
-export function ViewManager({ currentView }: ViewManagerProps) {
+export function ViewManager({ currentView, setCurrentView }: ViewManagerProps) {
   const fileProcessing = useFileProcessing();
-  const quizManagement = useQuizManagement(null);
+  const quizManagement = useQuizManagement();
   const tutorialProgress = useTutorialProgress();
-  const { tutorials, loading: tutorialsLoading, error: tutorialsError } = useTutorialList();
+  
+  // Use quizManagement's refreshTrigger to refresh tutorials when progress is reset
+  const { tutorials, loading: tutorialsLoading, error: tutorialsError } = useTutorialList(quizManagement.refreshTrigger);
+
+  // Add a refresh key for ProgressPage
+  const [progressRefreshKey, setProgressRefreshKey] = useState(0);
+
+  // Handle progress reset from ProgressPage
+  useEffect(() => {
+    const handleProgressReset = () => {
+      quizManagement.refreshData();
+      setProgressRefreshKey(prev => prev + 1);
+    };
+    
+    window.addEventListener('progress-reset', handleProgressReset);
+    
+    return () => {
+      window.removeEventListener('progress-reset', handleProgressReset);
+    };
+  }, [quizManagement]);
+
+  const handleQuizComplete = useCallback((score: number, totalPoints: number, answers: Record<string, string | string[]>) => {
+    const { selectedTutorial } = quizManagement;
+    
+    if (!selectedTutorial) {
+      console.error("Missing tutorial ID in handleQuizComplete");
+      return;
+    }
+    
+    quizManagement.saveQuizResults(score, totalPoints, answers);
+  }, [quizManagement]);
+
+  const handleSubmitQuiz = useCallback(async (answers: Record<string, string | string[]>) => {
+    if (!quizManagement.selectedTutorial) {
+      console.error("Missing tutorial ID in handleSubmitQuiz");
+      return;
+    }
+    
+    try {
+      const result = await tutorialProgress.submitQuizAnswers(quizManagement.selectedTutorial, answers);
+      
+      await tutorialProgress.fetchProgress();
+      setProgressRefreshKey(k => k + 1);
+      
+      return result;
+    } catch (error) {
+      console.error("Failed to submit quiz:", error);
+      throw error;
+    }
+  }, [quizManagement.selectedTutorial, tutorialProgress]);
+
+  const handleQuizFinish = useCallback(() => {
+    quizManagement.resetQuiz();
+  }, [quizManagement]);
+
+  const handleRefreshTutorials = useCallback(() => {
+    quizManagement.refreshData();
+    tutorialProgress.fetchProgress();
+  }, [quizManagement, tutorialProgress]);
 
   const renderTutorialView = () => {
-    const { showQuiz, selectedTutorial, resetQuiz, setSelectedTutorial, setShowQuiz } = quizManagement;
+    const { 
+      showQuiz, 
+      showSummary, 
+      selectedTutorial, 
+      resetQuiz, 
+      startQuiz,
+      quizAnswers,
+      quizScore,
+      quizTotalPoints,
+      isResetting
+    } = quizManagement;
     const { progress, isLoading: progressLoading, error: progressError, submitQuizAnswers } = tutorialProgress;
 
     if (tutorialsLoading || progressLoading) {
@@ -35,7 +104,7 @@ export function ViewManager({ currentView }: ViewManagerProps) {
       );
     }
 
-    if (showQuiz && selectedTutorial) { // selectedTutorial is the ID
+    if (showQuiz && selectedTutorial) {
       const { tutorial: detailedTutorialData, loading: quizLoading, error: quizError } = quizManagement;
 
       if (quizLoading) {
@@ -56,24 +125,16 @@ export function ViewManager({ currentView }: ViewManagerProps) {
 
       return (
         <QuizComponent
-          tutorialId={selectedTutorial} // This is the ID string
+          tutorialId={selectedTutorial}
           tutorialTitle={detailedTutorialData.title || ""}
-          questions={detailedTutorialData.questions || []} // Use questions from detailedTutorialData
-          onComplete={(score, totalPoints, answers) => {
-            // Ensure submitQuizAnswers can handle a string ID if necessary,
-            // or parse selectedTutorial to number if API strictly requires number.
-            // Currently, Tutorial.id is string, submitQuizAnswers expects number.
-            const tutorialIdAsNumber = parseInt(selectedTutorial, 10);
-            if (!isNaN(tutorialIdAsNumber)) {
-              submitQuizAnswers(tutorialIdAsNumber, answers);
-            } else {
-              console.error("Failed to parse tutorialId to number:", selectedTutorial);
-              // Optionally, handle this error more gracefully in the UI
-            }
-          }}
-          onFinish={() => {
-            resetQuiz();
-          }}
+          questions={detailedTutorialData.questions || []}
+          showSummary={showSummary}
+          answers={quizAnswers}
+          initialScore={quizScore}
+          initialTotalPoints={quizTotalPoints}
+          onComplete={handleQuizComplete}
+          onFinish={handleQuizFinish}
+          onSubmitToBackend={handleSubmitQuiz}
         />
       );
     }
@@ -81,32 +142,40 @@ export function ViewManager({ currentView }: ViewManagerProps) {
     return (
       <TutorialList
         tutorials={tutorials || []}
-        completedTutorialIds={(progress?.completed_tutorials || []).map(String)}
-        onSelectTutorial={(id) => {
-          setSelectedTutorial(id); // This triggers fetchTutorialDetail in useQuizManagement
-          setShowQuiz(true);
-        }}
+        completedTutorialIds={(progress?.completedTutorials || []).map(String)}
+        onSelectTutorial={(id) => startQuiz(id)}
+        isResettingProgress={isResetting}
+        onRefresh={handleRefreshTutorials}
       />
     );
   };
 
-  switch (currentView) {
-    case 'tutorials':
-      return renderTutorialView();
-
-    case 'progress':
-      return <ProgressPage />;
-
-    default:
-      return (
-        <MainDashboard
-          file={fileProcessing.file}
-          loading={fileProcessing.loading}
-          segmentationResult={fileProcessing.segmentationResult}
-          show3D={fileProcessing.show3D}
-          setShow3D={fileProcessing.setShow3D}
-          handleFileSelect={fileProcessing.handleFileSelect}
-        />
-      );
-  }
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Header 
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        progress={tutorialProgress.progress}
+      />
+      
+      <main className="flex-1 pt-4 pb-8 px-4 sm:px-6 lg:px-8">
+        {currentView === 'tutorials' && renderTutorialView()}
+        {currentView === 'progress' && <ProgressPage key={progressRefreshKey} />}
+        {currentView === 'dashboard' && (
+          <MainDashboard
+            file={fileProcessing.file}
+            loading={fileProcessing.loading}
+            segmentationResult={fileProcessing.segmentationResult}
+            show3D={fileProcessing.show3D}
+            setShow3D={fileProcessing.setShow3D}
+            handleFileSelect={fileProcessing.handleFileSelect}
+            showSegmentationChoice={fileProcessing.showSegmentationChoice}
+            handleSegmentationChoice={fileProcessing.handleSegmentationChoice}
+            showManualSegmentation={fileProcessing.showManualSegmentation}
+            completeManualSegmentation={fileProcessing.completeManualSegmentation}
+          />
+        )}
+      </main>
+    </div>
+  );
 }

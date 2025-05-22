@@ -12,12 +12,21 @@ class Command(BaseCommand):
             defaults={'email': 'student@medical.edu'}
         )
 
+        # Define quiz images for each topic
+        quiz_images = {
+            "tnm-prefixes": "https://radiologyassistant.nl/assets/-1tek-intro-lungca.jpg",
+            "subsolid-lesions": "https://radiologyassistant.nl/assets/-1tabel-subsolid.png",
+            "t-staging": "https://radiologyassistant.nl/assets/1-tek-t1-1736590259.jpg",
+            "n-staging": "https://radiologyassistant.nl/assets/_1-tek-lnn3.jpg", 
+            "m-staging": "https://radiologyassistant.nl/assets/_1-m1a-1736630514.jpg"
+        }
+
         quizzes = [
             {
                 "id": "tnm-prefixes",
                 "title": "TNM Prefixes and Basic Concepts",
                 "questions": [
-                    ("What does the ‘p’ prefix in TNM staging indicate?",
+                    ("What does the 'p' prefix in TNM staging indicate?",
                      ["Clinical pretreatment staging", "Pathologic stage based on surgical resection only", "Restaging after part or all treatment", "Evaluation category for imaging"],
                      "Pathologic stage based on surgical resection only"),
 
@@ -146,7 +155,7 @@ class Command(BaseCommand):
                 id=quiz["id"],
                 defaults={
                     "title": quiz["title"],
-                    "thumbnail": f"https://via.placeholder.com/300x200?text={quiz['title'].replace(' ', '+')}",
+                    "thumbnail": quiz_images.get(quiz["id"]) or f"https://via.placeholder.com/300x200?text={quiz['title'].replace(' ', '+')}",
                     "duration": "10:00",
                     "tutorial_type": "practice",
                     "topic": "tnm",
