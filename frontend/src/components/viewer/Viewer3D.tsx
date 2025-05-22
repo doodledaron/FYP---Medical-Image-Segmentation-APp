@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'; // Import useState
 import { SegmentationResult } from '../../types';
 import { Niivue, SLICE_TYPE } from '@niivue/niivue';
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'; // Import Eye and EyeOff icons
-import { ManualSegmentationViewer } from './ManualSegmentationViewer';
+import { ManualSegmentationViewer, ViewType } from './ManualSegmentationViewer';
 
 interface Viewer3DProps {
   segmentationData: SegmentationResult;
@@ -18,6 +18,8 @@ interface Viewer3DProps {
     originalImageData?: Float32Array;
     windowWidth?: number;
     windowCenter?: number;
+    viewType?: ViewType; // Add viewType to support remembering the view
+    flipped?: boolean; // Add flipped state
   } | null;
   showManualSegmentationPreview?: boolean;
   setShowManualSegmentationPreview?: (show: boolean) => void;
@@ -94,6 +96,13 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
       const nv = nvRef.current;
       const { originalFileUrl, tumorSegmentationUrl, lungSegmentationUrl } = segmentationData;
       
+      // Debug logs for URLs
+      console.log('Loading files from these URLs:', {
+        originalFileUrl,
+        tumorSegmentationUrl,
+        lungSegmentationUrl
+      });
+      
       // Check for required URLs
       if (!originalFileUrl) {
         setIsLoading(false);
@@ -157,6 +166,7 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
 
       try {
         // Clear + reload with new volumes
+        console.log('Loading volumes:', volumes);
         await nv.loadVolumes(volumes);
         
         // Set display properties
@@ -168,6 +178,12 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
       } catch (err) {
         console.error('Viewer3D load error:', err);
         setIsLoading(false); // Stop loading on error
+        
+        // Add a retry mechanism - if the error includes "Failed to fetch", try again
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network error')) {
+          console.log('Network error loading files, please make sure they are accessible at the specified paths');
+        }
       }
     };
     
@@ -182,37 +198,32 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
       {/* Main content area - flex layout for side-by-side display */}
       <div className={`flex ${showManualSegmentationPreview ? 'flex-row gap-4' : 'flex-col'}`}>
         {/* 3D Viewer container - adjusted width when side-by-side */}
-        <div className={`relative ${showManualSegmentationPreview ? 'w-1/2' : 'w-full'} h-[600px] bg-black rounded-lg overflow-hidden`}>
-          {/* Manual Segmentation Preview Toggle - only show if we have manual segmentation data */}
-          {hasManualSegmentation && (
-            <div className="absolute top-4 right-4 z-10">
-              <div className="bg-black/30 p-2 rounded-lg">
-                <div className="text-xs text-white font-semibold mb-1">Manual Segmentation</div>
+        <div className={`relative ${showManualSegmentationPreview ? 'w-1/2' : 'w-full'} h-[600px] bg-gray-50 rounded-lg overflow-hidden`}>
+          {/* Controls Bar - top right */}
+          <div className="absolute top-4 right-4 z-10">
+            
+            {/* Manual Segmentation Preview Toggle - only show if we have manual segmentation data */}
+            {hasManualSegmentation && (
+              <div className="flex bg-white rounded-full shadow-sm p-1">
                 <button
                   onClick={() => setShowManualSegmentationPreview(!showManualSegmentationPreview)}
                   className={`
-                    flex items-center gap-1 text-xs py-1 px-2 rounded-md transition-colors
+                    flex items-center justify-center gap-2 rounded-full px-3 h-8 transition-colors
                     ${showManualSegmentationPreview 
-                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-700 hover:bg-gray-100'
                     }
                   `}
+                  title={showManualSegmentationPreview ? "Hide Manual Segmentation" : "Show Manual Segmentation"}
                 >
-                  {showManualSegmentationPreview ? (
-                    <>
-                      <EyeOff size={14} />
-                      Hide Manual
-                    </>
-                  ) : (
-                    <>
-                      <Eye size={14} />
-                      Show Manual
-                    </>
-                  )}
+                  {showManualSegmentationPreview ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <span className="text-sm whitespace-nowrap">
+                    {showManualSegmentationPreview ? "Hide Manual Segmentation" : "View Manual Segmentation"}
+                  </span>
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
             
           {/* Always render the canvas to maintain its DOM presence, but conditionally show content */}
           <canvas 
@@ -223,12 +234,12 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
           
           {/* No components selected message */}
           {noComponentsSelected && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
-              <div className="bg-gray-800/80 backdrop-blur-sm p-6 rounded-xl flex flex-col items-center gap-4 max-w-md text-center">
-                <AlertCircle className="h-12 w-12 text-yellow-500" />
-                <h3 className="text-xl font-semibold text-white">No View Components Selected</h3>
-                <p className="text-gray-300">
-                  Please select at least one view component (Body, Lung, or Tumour) from the checkboxes above to visualize the data.
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+              <div className="bg-white shadow-sm p-6 rounded-2xl flex flex-col items-center gap-4 max-w-md text-center">
+                <AlertCircle className="h-12 w-12 text-gray-400" />
+                <h3 className="text-xl font-medium text-gray-900">No Components Selected</h3>
+                <p className="text-gray-600">
+                  Please select at least one component (Body, Lung, or Tumour) from the checkboxes above to visualize the data.
                 </p>
               </div>
             </div>
@@ -236,15 +247,18 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
           
           {/* Loading Overlay */}
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
-              <Loader2 className="animate-spin h-12 w-12 text-white" />
+            <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10">
+              <div className="bg-white p-4 rounded-xl shadow-sm flex flex-col items-center gap-3">
+                <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
+                <div className="text-sm text-gray-700">Loading visualization...</div>
+              </div>
             </div>
           )}
         </div>
 
         {/* Manual Segmentation Preview - Side panel */}
         {showManualSegmentationPreview && (
-          <div className="w-1/2 h-[600px] rounded-lg border border-blue-200 flex flex-col">
+          <div className="w-1/2 h-[600px] rounded-lg shadow-sm overflow-hidden bg-white">
             {manualSegmentationData ? (
               /* If we have full segmentation data, use the interactive viewer */
               <ManualSegmentationViewer 
@@ -253,19 +267,21 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
                 originalImageData={manualSegmentationData.originalImageData}
                 windowWidth={manualSegmentationData.windowWidth}
                 windowCenter={manualSegmentationData.windowCenter}
+                initialViewType={manualSegmentationData.viewType}
+                flipped={manualSegmentationData.flipped}
               />
             ) : manualSegmentationScreenshot ? (
               /* Fallback to screenshot if we only have that */
               <>
-                <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 text-center font-medium rounded-t-lg">
-                  Manual Segmentation Preview
+                <div className="bg-white border-b border-gray-100 text-gray-900 p-3 text-center font-medium">
+                  Manual Segmentation
                 </div>
-                <div className="flex-1 flex items-center justify-center bg-gray-900 rounded-b-lg overflow-hidden">
+                <div className="flex-1 flex items-center justify-center bg-gray-50 overflow-hidden">
                   <div className="relative max-w-full max-h-full p-2">
                     <img 
                       src={manualSegmentationScreenshot} 
                       alt="Manual Segmentation" 
-                      className="max-w-full max-h-[550px] object-contain rounded shadow-lg"
+                      className="max-w-full max-h-[550px] object-contain rounded shadow-sm"
                     />
                   </div>
                 </div>

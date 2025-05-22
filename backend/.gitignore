@@ -43,4 +43,3 @@ coverage.xml
 Thumbs.db
 
 #large nifti files
-models/nnunet/input_dir/
