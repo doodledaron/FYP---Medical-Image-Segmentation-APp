@@ -152,7 +152,7 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
         volumes.push({
           url: lungSegmentationUrl,
           colormap: 'copper',
-          opacity: 0.04,
+          opacity: (!showBody && !showTumour) ? 1.0 : 0.04,
           visible: true,
         });
       }
