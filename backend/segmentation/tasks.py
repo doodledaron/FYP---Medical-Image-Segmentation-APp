@@ -137,21 +137,45 @@ def process_segmentation_task(task_id):
             else:
                 print(f"No old {field_name} file to remove")
         
-        # Update the task with the file paths - assign file names directly to the FileField
+        # Update the task with the file paths - assign file names and ensure they exist
         print(f"Updating task with new file paths...")
         
-        # Set the file paths directly to the FileField name attribute
-        # This tells Django where the files are located without copying them
+        # Simple approach: Just assign the relative paths directly
+        # Django should be able to generate URLs from these paths
         task.tumor_segmentation.name = media_relative_paths['tumor_segmentation']
         task.lung_segmentation.name = media_relative_paths['lung_segmentation']
         
+        # Debug: Print the assigned paths
+        print(f"Assigned tumor segmentation path: {task.tumor_segmentation.name}")
+        print(f"Assigned lung segmentation path: {task.lung_segmentation.name}")
+        
+        # Verify the files actually exist at the assigned paths
+        tumor_full_path = os.path.join(settings.MEDIA_ROOT, task.tumor_segmentation.name)
+        lung_full_path = os.path.join(settings.MEDIA_ROOT, task.lung_segmentation.name)
+        
+        print(f"Checking tumor file exists at: {tumor_full_path}")
+        print(f"Tumor file exists: {os.path.exists(tumor_full_path)}")
+        print(f"Checking lung file exists at: {lung_full_path}")
+        print(f"Lung file exists: {os.path.exists(lung_full_path)}")
+        
         # Save the task with updated file references
-        task.save(update_fields=['tumor_segmentation', 'lung_segmentation'])
+        task.save()
         print(f"✓ Task updated with new file paths")
         
+        # Refresh task from database to ensure FileFields are properly loaded
+        task.refresh_from_db()
+        
         # Verify the file URLs can be generated
-        print(f"Tumor segmentation URL: {task.tumor_segmentation.url if task.tumor_segmentation else 'None'}")
-        print(f"Lung segmentation URL: {task.lung_segmentation.url if task.lung_segmentation else 'None'}")
+        try:
+            tumor_url = task.tumor_segmentation.url if task.tumor_segmentation else 'None'
+            lung_url = task.lung_segmentation.url if task.lung_segmentation else 'None'
+            print(f"Tumor segmentation URL: {tumor_url}")
+            print(f"Lung segmentation URL: {lung_url}")
+        except Exception as url_error:
+            print(f"❌ Error generating URLs: {str(url_error)}")
+            # Debug file field states
+            print(f"Tumor segmentation name: {task.tumor_segmentation.name if task.tumor_segmentation else 'None'}")
+            print(f"Lung segmentation name: {task.lung_segmentation.name if task.lung_segmentation else 'None'}")
         
         print(f"=== VERIFYING SAVED FILES ===")
         # Verify the saved files can be loaded with nibabel
