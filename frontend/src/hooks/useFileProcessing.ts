@@ -245,11 +245,15 @@ export function useFileProcessing() {
         attempts++;
         await new Promise(resolve => setTimeout(resolve, pollingInterval));
 
+        console.log(`Polling attempt ${attempts}/${maxAttempts} for task ${taskId}`);
+
         try {
           // Check task status with timeout - use the status endpoint
           const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/status/`, {
             timeout: 10000 // 10 seconds timeout for status checks
           });
+
+          console.log(`Status response for attempt ${attempts}:`, statusResponse.data);
 
           if (statusResponse.data.status === "completed") {
             taskComplete = true;
@@ -297,6 +301,8 @@ export function useFileProcessing() {
             setSegmentationResult(result);
           } else if (statusResponse.data.status === "failed") {
             throw new Error(statusResponse.data.error || "Processing failed");
+          } else {
+            console.log(`Task ${taskId} status: ${statusResponse.data.status}, continuing to poll...`);
           }
         } catch (pollError) {
           console.error("Error during polling:", pollError);
