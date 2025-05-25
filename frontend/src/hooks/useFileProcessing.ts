@@ -233,13 +233,21 @@ export function useFileProcessing() {
         timeout: 60000, // 60 seconds timeout for the initial upload
       });
 
+      console.log("Task creation response:", response.data);
       const taskId = response.data.task_id;
+      console.log("Task ID received:", taskId);
+
+      if (!taskId) {
+        throw new Error("No task ID received from server");
+      }
 
       // Poll for task completion with longer timeout
       let taskComplete = false;
       let attempts = 0;
-      const maxAttempts = 120;
-      const pollingInterval = 3000;
+      const maxAttempts = 20; // Reduced from 120 for faster testing
+      const pollingInterval = 2000; // Reduced from 3000 for faster testing
+
+      console.log(`Starting polling for task ${taskId} with ${maxAttempts} max attempts, ${pollingInterval}ms interval`);
 
       while (!taskComplete && attempts < maxAttempts) {
         attempts++;
@@ -249,7 +257,10 @@ export function useFileProcessing() {
 
         try {
           // Check task status with timeout - use the status endpoint
-          const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/status/`, {
+          const statusUrl = `${API_URL}/tasks/${taskId}/status/`;
+          console.log(`Calling status endpoint: ${statusUrl}`);
+          
+          const statusResponse = await axios.get(statusUrl, {
             timeout: 10000 // 10 seconds timeout for status checks
           });
 
@@ -306,6 +317,12 @@ export function useFileProcessing() {
           }
         } catch (pollError) {
           console.error("Error during polling:", pollError);
+          console.error("Poll error details:", {
+            message: pollError instanceof Error ? pollError.message : String(pollError),
+            isAxiosError: axios.isAxiosError(pollError),
+            response: axios.isAxiosError(pollError) ? pollError.response?.data : null,
+            status: axios.isAxiosError(pollError) ? pollError.response?.status : null
+          });
           // Continue polling despite error
         }
       }
