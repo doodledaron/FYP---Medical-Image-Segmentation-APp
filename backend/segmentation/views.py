@@ -173,6 +173,19 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             print(f"  - Has tumor segmentation: {bool(instance.tumor_segmentation)}")
             print(f"  - Has lung segmentation: {bool(instance.lung_segmentation)}")
             
+            # Debug FileField details
+            if instance.tumor_segmentation:
+                print(f"  - Tumor segmentation name: {instance.tumor_segmentation.name}")
+                print(f"  - Tumor segmentation name bool: {bool(instance.tumor_segmentation.name)}")
+            else:
+                print(f"  - Tumor segmentation is None/empty")
+                
+            if instance.lung_segmentation:
+                print(f"  - Lung segmentation name: {instance.lung_segmentation.name}")
+                print(f"  - Lung segmentation name bool: {bool(instance.lung_segmentation.name)}")
+            else:
+                print(f"  - Lung segmentation is None/empty")
+            
             serializer = self.get_serializer(instance, context={'request': request})
             
             # Debug: print the serialized data to check URLs
@@ -212,6 +225,19 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             print(f"  - Created: {task.created_at}")
             print(f"  - Updated: {task.updated_at}")
             print(f"  - Error: {task.error if hasattr(task, 'error') else 'None'}")
+            
+            # Debug FileField details
+            if task.tumor_segmentation:
+                print(f"  - Tumor segmentation name: {task.tumor_segmentation.name}")
+                print(f"  - Tumor segmentation name bool: {bool(task.tumor_segmentation.name)}")
+            else:
+                print(f"  - Tumor segmentation is None/empty")
+                
+            if task.lung_segmentation:
+                print(f"  - Lung segmentation name: {task.lung_segmentation.name}")
+                print(f"  - Lung segmentation name bool: {bool(task.lung_segmentation.name)}")
+            else:
+                print(f"  - Lung segmentation is None/empty")
             
             # Check if both segmentation files exist when the task is completed
             if task.status == 'completed':
