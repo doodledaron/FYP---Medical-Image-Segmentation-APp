@@ -159,12 +159,17 @@ export function useFileProcessing() {
         setShowManualSegmentation(true);
       }
     } else {
+      // TEMPORARY: Always use mock segmentation for AI mode to test URL flow
+      console.log("TEMPORARY: Using mock segmentation for AI mode to test URL flow");
+      startMockSegmentation();
+      
+      // COMMENTED OUT FOR TESTING:
       // For AI segmentation, check if it's mock data
-      if (isMockData) {
-        startMockSegmentation();
-      } else {
-        startAISegmentation();
-      }
+      // if (isMockData) {
+      //   startMockSegmentation();
+      // } else {
+      //   startAISegmentation();
+      // }
     }
   };
 
