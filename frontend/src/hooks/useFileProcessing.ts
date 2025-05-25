@@ -246,18 +246,38 @@ export function useFileProcessing() {
         await new Promise(resolve => setTimeout(resolve, pollingInterval));
 
         try {
-          // Check task status with timeout
-          const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/`, {
+          // Check task status with timeout - use the status endpoint
+          const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/status/`, {
             timeout: 10000 // 10 seconds timeout for status checks
           });
 
           if (statusResponse.data.status === "completed") {
             taskComplete = true;
 
+            // Debug: Log the full response to see what we're getting
+            console.log("Full API response:", statusResponse.data);
+
             // Get the URLs for both segmentations
             const tumorSegUrl = statusResponse.data.tumor_segmentation_url;
             const lungSegUrl = statusResponse.data.lung_segmentation_url;
             const originalNiftiUrl = statusResponse.data.nifti_file_url;
+
+            // Debug: Log the individual URL fields
+            console.log("URL fields from API:");
+            console.log("  originalNiftiUrl:", originalNiftiUrl);
+            console.log("  tumorSegUrl:", tumorSegUrl);
+            console.log("  lungSegUrl:", lungSegUrl);
+
+            // Validate that we have all required URLs
+            if (!originalNiftiUrl) {
+              throw new Error("Missing original NIFTI file URL in API response");
+            }
+            if (!tumorSegUrl) {
+              throw new Error("Missing tumor segmentation URL in API response");
+            }
+            if (!lungSegUrl) {
+              throw new Error("Missing lung segmentation URL in API response");
+            }
 
             // Create a result object with the data needed by your viewers
             const result = {
