@@ -4,6 +4,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
+from storage import WSLCompatibleFileStorage  # 👈 add this
 
 def nifti_file_path(instance, filename):
     """Generate file path for uploaded NIFTI files (ensuring .nii.gz)."""
@@ -49,7 +50,7 @@ class SegmentationTask(models.Model):
     user           = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
                                        related_name='segmentation_tasks')
     file_name      = models.CharField(max_length=255)
-    nifti_file     = models.FileField(upload_to=nifti_file_path)
+    nifti_file = models.FileField(upload_to=nifti_file_path, storage=WSLCompatibleFileStorage())
     status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued')
     tumor_segmentation = models.FileField(upload_to=tumor_segmentation_path,
                                       max_length=255, null=True, blank=True)

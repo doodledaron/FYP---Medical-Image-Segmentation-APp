@@ -1,2 +1,3 @@
 backend/models/
 frontend/public/
+*.nii.gz

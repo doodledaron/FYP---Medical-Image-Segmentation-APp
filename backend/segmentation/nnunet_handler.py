@@ -130,7 +130,7 @@ class NNUNetHandler:
                     os.remove(file_path)
             
             # Copy input file to input directory with proper naming
-            shutil.copy(input_file_path, input_copy_path)
+            shutil.copyfile(input_file_path, input_copy_path)
             logger.info(f"Copied and renamed input file to {input_copy_path} for nnUNet processing")
             
             # Prepare environment variables for nnUNet
@@ -144,7 +144,7 @@ class NNUNetHandler:
             tumor_output_dir = os.path.join(self.output_dir, "tumor_segmentation")
             tumor_file = self._run_prediction(input_copy_path, tumor_output_dir, self.tumor_model, env, timeout)
             if tumor_file:
-                shutil.copy(tumor_file, tumor_dest)
+                shutil.copyfile(tumor_file, tumor_dest)
                 logger.info(f"Tumor segmentation saved to {tumor_dest}")
             else:
                 raise RuntimeError("Tumor segmentation failed to produce output file")
@@ -154,16 +154,18 @@ class NNUNetHandler:
             lung_output_dir = os.path.join(self.output_dir, "lung_segmentation")
             lung_file = self._run_prediction(input_copy_path, lung_output_dir, self.lung_model, env, timeout)
             if lung_file:
-                shutil.copy(lung_file, lung_dest)
+                shutil.copyfile(lung_file, lung_dest)
                 logger.info(f"Lung segmentation saved to {lung_dest}")
             else:
                 raise RuntimeError("Lung segmentation failed to produce output file")
             
-            # Ensure file permissions are set correctly
+            # Set permissions, but ignore PermissionError on systems like WSL
             for dest in [tumor_dest, lung_dest]:
-                os.chmod(dest, 0o644)
-                file_size = os.path.getsize(dest)
-                logger.info(f"Saved file size for {dest}: {file_size} bytes")
+                try:
+                    os.chmod(dest, 0o644)
+                except PermissionError:
+                    logger.warning(f"Skipping chmod on {dest} due to permission error")
+
             
             logger.info(f"Segmentation completed: saved to {tumor_dest} and {lung_dest}")
             return {
@@ -203,9 +205,11 @@ class NNUNetHandler:
                 "-o", output_dir,
                 "-d", model_config["dataset"],
                 "-c", model_config["config"],
-                "-tr", "nnUNetTrainer",  # Add trainer parameter back
-                "-device", self.device
+                "-tr", "nnUNetTrainer",
+                "-device", self.device,
+                
             ]
+
             
             # Execute nnUNet prediction
             cmd_str = ' '.join(cmd)
@@ -318,8 +322,8 @@ class NNUNetHandler:
                 lung_file = os.path.join(lung_output_dir, lung_files[0])
                 
                 # Copy to destination
-                shutil.copy(tumor_file, tumor_dest)
-                shutil.copy(lung_file, lung_dest)
+                shutil.copyfile(tumor_file, tumor_dest)
+                shutil.copyfile(lung_file, lung_dest)
                 
                 logger.info(f"Copied existing fallback segmentations to {tumor_dest} and {lung_dest}")
                 return {

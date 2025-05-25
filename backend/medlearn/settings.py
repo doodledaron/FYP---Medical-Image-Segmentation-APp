@@ -323,3 +323,6 @@ UNFOLD = {
         },
     },
 }
+
+# Fix for WSL/NTFS PermissionError when saving uploaded files
+FILE_UPLOAD_PERMISSIONS = None
