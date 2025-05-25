@@ -174,8 +174,16 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             print(f"  - Has lung segmentation: {bool(instance.lung_segmentation)}")
             
             serializer = self.get_serializer(instance, context={'request': request})
+            
+            # Debug: print the serialized data to check URLs
+            serialized_data = serializer.data
+            print(f"Serialized response data for retrieve:")
+            print(f"  - tumor_segmentation_url: {serialized_data.get('tumor_segmentation_url')}")
+            print(f"  - lung_segmentation_url: {serialized_data.get('lung_segmentation_url')}")
+            print(f"  - nifti_file_url: {serialized_data.get('nifti_file_url')}")
+            
             print(f"✓ Task serialized successfully")
-            return Response(serializer.data)
+            return Response(serialized_data)
         except Exception as e:
             print(f"❌ ERROR: Failed to retrieve task: {str(e)}")
             logger.error(f"Error retrieving task: {e}")
@@ -250,8 +258,16 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             # Add context={'request': request} to pass the request to the serializer
             print(f"Serializing task for response...")
             serializer = self.get_serializer(task, context={'request': request})
+            
+            # Debug: print the serialized data to check URLs
+            serialized_data = serializer.data
+            print(f"Serialized response data:")
+            print(f"  - tumor_segmentation_url: {serialized_data.get('tumor_segmentation_url')}")
+            print(f"  - lung_segmentation_url: {serialized_data.get('lung_segmentation_url')}")
+            print(f"  - nifti_file_url: {serialized_data.get('nifti_file_url')}")
+            
             print(f"✓ Status check completed successfully")
-            return Response(serializer.data)
+            return Response(serialized_data)
         except SegmentationTask.DoesNotExist:
             print(f"❌ ERROR: Task {pk} not found in database")
             return Response(

@@ -124,11 +124,11 @@ def process_segmentation_task(task_id):
             print(f"Processing {field_name}...")
             old_file = getattr(task, field_name)
             if old_file:
-                old_file_path = old_file.path
+                old_file_path = old_file.path if hasattr(old_file, 'path') else None
                 print(f"Found old {field_name} file: {old_file_path}")
                 old_file.delete(save=False)
                 # Only delete the old file if it's different from the new one
-                if os.path.exists(old_file_path) and old_file_path != result_files[field_name]:
+                if old_file_path and os.path.exists(old_file_path) and old_file_path != result_files[field_name]:
                     try:
                         os.remove(old_file_path)
                         print(f"✓ Removed old {field_name} file: {old_file_path}")
@@ -137,12 +137,21 @@ def process_segmentation_task(task_id):
             else:
                 print(f"No old {field_name} file to remove")
         
-        # Update the task with the file paths
+        # Update the task with the file paths - assign file names directly to the FileField
         print(f"Updating task with new file paths...")
+        
+        # Set the file paths directly to the FileField name attribute
+        # This tells Django where the files are located without copying them
         task.tumor_segmentation.name = media_relative_paths['tumor_segmentation']
         task.lung_segmentation.name = media_relative_paths['lung_segmentation']
+        
+        # Save the task with updated file references
         task.save(update_fields=['tumor_segmentation', 'lung_segmentation'])
         print(f"✓ Task updated with new file paths")
+        
+        # Verify the file URLs can be generated
+        print(f"Tumor segmentation URL: {task.tumor_segmentation.url if task.tumor_segmentation else 'None'}")
+        print(f"Lung segmentation URL: {task.lung_segmentation.url if task.lung_segmentation else 'None'}")
         
         print(f"=== VERIFYING SAVED FILES ===")
         # Verify the saved files can be loaded with nibabel

@@ -159,17 +159,12 @@ export function useFileProcessing() {
         setShowManualSegmentation(true);
       }
     } else {
-      // TEMPORARY: Always use mock segmentation for AI mode to test URL flow
-      console.log("TEMPORARY: Using mock segmentation for AI mode to test URL flow");
-      startMockSegmentation();
-      
-      // COMMENTED OUT FOR TESTING:
       // For AI segmentation, check if it's mock data
-      // if (isMockData) {
-      //   startMockSegmentation();
-      // } else {
-      //   startAISegmentation();
-      // }
+      if (isMockData) {
+        startMockSegmentation();
+      } else {
+        startAISegmentation();
+      }
     }
   };
 
@@ -238,66 +233,37 @@ export function useFileProcessing() {
         timeout: 60000, // 60 seconds timeout for the initial upload
       });
 
-      console.log("Task creation response:", response.data);
       const taskId = response.data.task_id;
-      console.log("Task ID received:", taskId);
-
-      if (!taskId) {
-        throw new Error("No task ID received from server");
-      }
 
       // Poll for task completion with longer timeout
       let taskComplete = false;
       let attempts = 0;
-      const maxAttempts = 20; // Reduced from 120 for faster testing
-      const pollingInterval = 2000; // Reduced from 3000 for faster testing
-
-      console.log(`Starting polling for task ${taskId} with ${maxAttempts} max attempts, ${pollingInterval}ms interval`);
+      const maxAttempts = 120;
+      const pollingInterval = 3000;
 
       while (!taskComplete && attempts < maxAttempts) {
         attempts++;
         await new Promise(resolve => setTimeout(resolve, pollingInterval));
 
-        console.log(`Polling attempt ${attempts}/${maxAttempts} for task ${taskId}`);
-
         try {
-          // Check task status with timeout - use the status endpoint
-          const statusUrl = `${API_URL}/tasks/${taskId}/status/`;
-          console.log(`Calling status endpoint: ${statusUrl}`);
-          
-          const statusResponse = await axios.get(statusUrl, {
+          // Check task status with timeout
+          const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/`, {
             timeout: 10000 // 10 seconds timeout for status checks
           });
 
-          console.log(`Status response for attempt ${attempts}:`, statusResponse.data);
-
           if (statusResponse.data.status === "completed") {
             taskComplete = true;
-
-            // Debug: Log the full response to see what we're getting
-            console.log("Full API response:", statusResponse.data);
 
             // Get the URLs for both segmentations
             const tumorSegUrl = statusResponse.data.tumor_segmentation_url;
             const lungSegUrl = statusResponse.data.lung_segmentation_url;
             const originalNiftiUrl = statusResponse.data.nifti_file_url;
 
-            // Debug: Log the individual URL fields
-            console.log("URL fields from API:");
-            console.log("  originalNiftiUrl:", originalNiftiUrl);
-            console.log("  tumorSegUrl:", tumorSegUrl);
-            console.log("  lungSegUrl:", lungSegUrl);
-
-            // Validate that we have all required URLs
-            if (!originalNiftiUrl) {
-              throw new Error("Missing original NIFTI file URL in API response");
-            }
-            if (!tumorSegUrl) {
-              throw new Error("Missing tumor segmentation URL in API response");
-            }
-            if (!lungSegUrl) {
-              throw new Error("Missing lung segmentation URL in API response");
-            }
+            // Debug: Log the URLs received from the API
+            console.log("URLs received from API:");
+            console.log("  - Tumor segmentation URL:", tumorSegUrl);
+            console.log("  - Lung segmentation URL:", lungSegUrl);
+            console.log("  - Original NIFTI URL:", originalNiftiUrl);
 
             // Create a result object with the data needed by your viewers
             const result = {
@@ -314,20 +280,13 @@ export function useFileProcessing() {
               }
             };
             
+            console.log("Final result object:", result);
             setSegmentationResult(result);
           } else if (statusResponse.data.status === "failed") {
             throw new Error(statusResponse.data.error || "Processing failed");
-          } else {
-            console.log(`Task ${taskId} status: ${statusResponse.data.status}, continuing to poll...`);
           }
         } catch (pollError) {
           console.error("Error during polling:", pollError);
-          console.error("Poll error details:", {
-            message: pollError instanceof Error ? pollError.message : String(pollError),
-            isAxiosError: axios.isAxiosError(pollError),
-            response: axios.isAxiosError(pollError) ? pollError.response?.data : null,
-            status: axios.isAxiosError(pollError) ? pollError.response?.status : null
-          });
           // Continue polling despite error
         }
       }

@@ -90,12 +90,6 @@ class NNUNetHandler:
         Returns:
             Dictionary containing paths to both segmentation files
         """
-        # TEMPORARY: Use fallback inference immediately for testing
-        logger.info(f"TEMPORARY: Using fallback inference immediately for testing")
-        return self.fallback_inference(input_file_path)
-        
-        # COMMENTED OUT FOR TESTING - REAL NNUNET CODE BELOW
-        """
         # Extract the task_id from the input file path
         file_basename = os.path.basename(input_file_path)
         task_id = file_basename.split('_')[0]
@@ -182,7 +176,6 @@ class NNUNetHandler:
         except Exception as e:
             logger.exception(f"Error in nnUNet prediction: {str(e)}")
             raise RuntimeError(f"Error in nnUNet prediction: {str(e)}")
-        """
     
     def _run_prediction(self, input_file_path, output_dir, model_config, env, timeout=1800):
         """

@@ -70,12 +70,6 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
     // Skip if no canvas is available
     if (!canvasRef.current) return;
 
-    // Skip if segmentationData is null or doesn't have required URLs
-    if (!segmentationData || !segmentationData.success) {
-      console.log('Skipping Viewer3D load: segmentationData not ready or failed');
-      return;
-    }
-
     setIsLoading(true); // Start loading
 
     const loadData = async () => {

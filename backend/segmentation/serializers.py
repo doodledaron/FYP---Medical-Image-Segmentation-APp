@@ -39,40 +39,43 @@ class SegmentationTaskDetailSerializer(serializers.ModelSerializer):
         ]
     
     def get_tumor_segmentation_url(self, obj):
-        logger.info(f"Getting tumor segmentation URL for task {obj.id}")
-        logger.info(f"  tumor_segmentation field: {obj.tumor_segmentation}")
         if obj.tumor_segmentation:
             request = self.context.get('request')
-            url = obj.tumor_segmentation.url
-            logger.info(f"  raw URL: {url}")
-            absolute_url = request.build_absolute_uri(url) if request else url
-            logger.info(f"  absolute URL: {absolute_url}")
-            return absolute_url
-        logger.warning(f"  No tumor segmentation file for task {obj.id}")
+            try:
+                url = obj.tumor_segmentation.url
+                absolute_url = request.build_absolute_uri(url) if request else url
+                logger.info(f"Tumor segmentation URL generated: {absolute_url}")
+                return absolute_url
+            except Exception as e:
+                logger.error(f"Error generating tumor segmentation URL: {e}")
+                logger.error(f"File name: {obj.tumor_segmentation.name}")
+                return None
         return None
     
     def get_lung_segmentation_url(self, obj):
-        logger.info(f"Getting lung segmentation URL for task {obj.id}")
-        logger.info(f"  lung_segmentation field: {obj.lung_segmentation}")
         if obj.lung_segmentation:
             request = self.context.get('request')
-            url = obj.lung_segmentation.url
-            logger.info(f"  raw URL: {url}")
-            absolute_url = request.build_absolute_uri(url) if request else url
-            logger.info(f"  absolute URL: {absolute_url}")
-            return absolute_url
-        logger.warning(f"  No lung segmentation file for task {obj.id}")
+            try:
+                url = obj.lung_segmentation.url
+                absolute_url = request.build_absolute_uri(url) if request else url
+                logger.info(f"Lung segmentation URL generated: {absolute_url}")
+                return absolute_url
+            except Exception as e:
+                logger.error(f"Error generating lung segmentation URL: {e}")
+                logger.error(f"File name: {obj.lung_segmentation.name}")
+                return None
         return None
     
     def get_nifti_file_url(self, obj):
-        logger.info(f"Getting NIFTI file URL for task {obj.id}")
-        logger.info(f"  nifti_file field: {obj.nifti_file}")
         if obj.nifti_file:
             request = self.context.get('request')
-            url = obj.nifti_file.url
-            logger.info(f"  raw URL: {url}")
-            absolute_url = request.build_absolute_uri(url) if request else url
-            logger.info(f"  absolute URL: {absolute_url}")
-            return absolute_url
-        logger.warning(f"  No NIFTI file for task {obj.id}")
+            try:
+                url = obj.nifti_file.url
+                absolute_url = request.build_absolute_uri(url) if request else url
+                logger.info(f"Original NIFTI file URL generated: {absolute_url}")
+                return absolute_url
+            except Exception as e:
+                logger.error(f"Error generating NIFTI file URL: {e}")
+                logger.error(f"File name: {obj.nifti_file.name}")
+                return None
         return None

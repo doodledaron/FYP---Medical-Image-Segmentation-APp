@@ -63,13 +63,6 @@ const NiftiViewer: React.FC<NiftiViewerProps> = ({
         return;
       }
 
-      // Skip if segmentationResult is null or doesn't have required URLs
-      if (!segmentationResult || !segmentationResult.success) {
-        console.log('Skipping NiftiViewer load: segmentationResult not ready or failed');
-        setIsLoading(false);
-        return;
-      }
-
       const { originalFileUrl, tumorSegmentationUrl, lungSegmentationUrl } = segmentationResult;
 
       if (!originalFileUrl || !tumorSegmentationUrl) {
