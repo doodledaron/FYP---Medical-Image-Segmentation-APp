@@ -16,6 +16,8 @@ interface MainDashboardProps {
   show3D: boolean;
   setShow3D: (show: boolean) => void;
   handleFileSelect: (file: File) => void;
+  handleRealFileSelect: (file: File) => void;
+  handleMockFileSelect: (file: File) => void;
   showSegmentationChoice: boolean;
   handleSegmentationChoice: (mode: "manual" | "ai") => void;
   showManualSegmentation: boolean;
@@ -89,6 +91,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   show3D,
   setShow3D,
   handleFileSelect,
+  handleRealFileSelect,
+  handleMockFileSelect,
   showSegmentationChoice,
   handleSegmentationChoice,
   showManualSegmentation,
@@ -195,7 +199,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
     
     // Create a mock File object to pass to the handler
     const mockFile = new File([""], "mock_lung_scan.nii.gz", { type: "application/gzip" });
-    handleFileSelect(mockFile);
+    handleMockFileSelect(mockFile);
   };
 
   return (
@@ -323,7 +327,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                     </div>
                   </div>
                   
-                  <FileUpload onFileSelect={handleFileSelect} />
+                  <FileUpload onFileSelect={handleRealFileSelect} />
                   
                   <p className="text-xs text-gray-500 mt-3 text-center">
                     Upload a .nii.gz or .nii file to begin AI-powered analysis

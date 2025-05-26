@@ -112,9 +112,10 @@ export function useFileProcessing() {
     }
   }, []);
 
-  const handleFileSelect = async (selectedFile: File | null): Promise<void> => {
+  const handleFileSelect = async (selectedFile: File | null, forcedMode?: 'mock' | 'real'): Promise<void> => {
     console.log("=== HANDLE FILE SELECT ===");
     console.log("Selected file:", selectedFile);
+    console.log("Forced mode:", forcedMode);
     
     // Handle clearing the file
     if (!selectedFile) {
@@ -128,10 +129,18 @@ export function useFileProcessing() {
       return;
     }
 
-    // If this is a mock file, set isMockData flag
-    const isMock = selectedFile.name.includes('mock');
+    // Determine if this is mock data based on forcedMode or filename
+    let isMock: boolean;
+    if (forcedMode) {
+      isMock = forcedMode === 'mock';
+      console.log(`Using forced mode: ${forcedMode}, isMock: ${isMock}`);
+    } else {
+      isMock = selectedFile.name.includes('mock');
+      console.log(`Using filename detection for: ${selectedFile.name}, isMock: ${isMock}`);
+    }
+    
     console.log(`File name: ${selectedFile.name}`);
-    console.log(`Is mock file: ${isMock}`);
+    console.log(`Final isMock decision: ${isMock}`);
     setIsMockData(isMock);
     
     // If this is a mock file and we have a preloaded version, use that
@@ -147,6 +156,18 @@ export function useFileProcessing() {
     setShowSegmentationChoice(true);
     setSegmentationMode(null);
     console.log("=== FILE SELECT COMPLETED ===");
+  };
+
+  // Wrapper function specifically for real file uploads
+  const handleRealFileSelect = async (selectedFile: File | null): Promise<void> => {
+    console.log("🤖 REAL FILE SELECT - forcing real mode");
+    return handleFileSelect(selectedFile, 'real');
+  };
+
+  // Wrapper function specifically for mock file selection  
+  const handleMockFileSelect = async (selectedFile: File | null): Promise<void> => {
+    console.log("🎭 MOCK FILE SELECT - forcing mock mode");
+    return handleFileSelect(selectedFile, 'mock');
   };
 
   const handleSegmentationChoice = (mode: "manual" | "ai"): void => {
@@ -480,6 +501,8 @@ export function useFileProcessing() {
     show3D, 
     setShow3D, 
     handleFileSelect,
+    handleRealFileSelect,
+    handleMockFileSelect,
     showSegmentationChoice,
     segmentationMode,
     handleSegmentationChoice,

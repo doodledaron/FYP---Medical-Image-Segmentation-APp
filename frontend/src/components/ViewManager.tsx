@@ -169,6 +169,8 @@ export function ViewManager({ currentView, setCurrentView }: ViewManagerProps) {
             show3D={fileProcessing.show3D}
             setShow3D={fileProcessing.setShow3D}
             handleFileSelect={fileProcessing.handleFileSelect}
+            handleRealFileSelect={fileProcessing.handleRealFileSelect}
+            handleMockFileSelect={fileProcessing.handleMockFileSelect}
             showSegmentationChoice={fileProcessing.showSegmentationChoice}
             handleSegmentationChoice={fileProcessing.handleSegmentationChoice}
             showManualSegmentation={fileProcessing.showManualSegmentation}
