@@ -1,5 +1,6 @@
 from celery import shared_task
 from django.core.files import File
+from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.conf import settings
 from datetime import timedelta
@@ -147,10 +148,35 @@ def process_segmentation_task(task_id):
         print(f"Tumor relative path: {tumor_relative_path}")
         print(f"Lung relative path: {lung_relative_path}")
         
-        # Directly assign the relative paths to the FileField name attributes
-        # This tells Django where the files are located relative to MEDIA_ROOT
-        task.tumor_segmentation.name = tumor_relative_path
-        task.lung_segmentation.name = lung_relative_path
+        # For tumor segmentation - read the file and save it through Django
+        print(f"Reading tumor segmentation file: {result_files['tumor_segmentation']}")
+        with open(result_files['tumor_segmentation'], 'rb') as f:
+            tumor_content = f.read()
+            tumor_filename = os.path.basename(result_files['tumor_segmentation'])
+            print(f"Tumor filename: {tumor_filename}, content size: {len(tumor_content)} bytes")
+            
+            # Clear any existing file first
+            if task.tumor_segmentation:
+                task.tumor_segmentation.delete(save=False)
+            
+            # Save the new file
+            task.tumor_segmentation.save(tumor_filename, ContentFile(tumor_content), save=False)
+            print(f"✓ Tumor segmentation saved: {task.tumor_segmentation.name}")
+        
+        # For lung segmentation - read the file and save it through Django  
+        print(f"Reading lung segmentation file: {result_files['lung_segmentation']}")
+        with open(result_files['lung_segmentation'], 'rb') as f:
+            lung_content = f.read()
+            lung_filename = os.path.basename(result_files['lung_segmentation'])
+            print(f"Lung filename: {lung_filename}, content size: {len(lung_content)} bytes")
+            
+            # Clear any existing file first
+            if task.lung_segmentation:
+                task.lung_segmentation.delete(save=False)
+            
+            # Save the new file
+            task.lung_segmentation.save(lung_filename, ContentFile(lung_content), save=False)
+            print(f"✓ Lung segmentation saved: {task.lung_segmentation.name}")
         
         # Save the task with updated file references
         task.save(update_fields=['tumor_segmentation', 'lung_segmentation', 'updated_at'])
@@ -159,8 +185,23 @@ def process_segmentation_task(task_id):
         # Verify the FileField names are set correctly
         print(f"Final tumor_segmentation.name: '{task.tumor_segmentation.name}'")
         print(f"Final lung_segmentation.name: '{task.lung_segmentation.name}'")
-        print(f"Tumor segmentation file exists: {os.path.exists(task.tumor_segmentation.path)}")
-        print(f"Lung segmentation file exists: {os.path.exists(task.lung_segmentation.path)}")
+        print(f"Tumor segmentation file exists: {os.path.exists(task.tumor_segmentation.path) if task.tumor_segmentation.name else False}")
+        print(f"Lung segmentation file exists: {os.path.exists(task.lung_segmentation.path) if task.lung_segmentation.name else False}")
+        
+        # Clean up the original files since we've copied them to Django's managed location
+        try:
+            if os.path.exists(result_files['tumor_segmentation']):
+                os.remove(result_files['tumor_segmentation'])
+                print(f"✓ Cleaned up original tumor file: {result_files['tumor_segmentation']}")
+        except Exception as e:
+            print(f"⚠️  Failed to clean up original tumor file: {e}")
+            
+        try:
+            if os.path.exists(result_files['lung_segmentation']):
+                os.remove(result_files['lung_segmentation'])
+                print(f"✓ Cleaned up original lung file: {result_files['lung_segmentation']}")
+        except Exception as e:
+            print(f"⚠️  Failed to clean up original lung file: {e}")
         
         print(f"=== VERIFYING SAVED FILES ===")
         # Verify the saved files can be loaded with nibabel
