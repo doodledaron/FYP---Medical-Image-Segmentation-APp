@@ -1,10 +1,6 @@
 from rest_framework import serializers
 from .models import SegmentationTask
 import os
-import logging
-
-# Set up logger for this file
-logger = logging.getLogger(__name__)
 
 class SegmentationTaskSerializer(serializers.ModelSerializer):
     """Serializer for segmentation tasks"""
@@ -39,28 +35,79 @@ class SegmentationTaskDetailSerializer(serializers.ModelSerializer):
         ]
     
     def get_tumor_segmentation_url(self, obj):
-        logger.info(f"Task {obj.id} - Serializing tumor_segmentation: name='{obj.tumor_segmentation.name if obj.tumor_segmentation else None}', field_exists={bool(obj.tumor_segmentation)}")
+        print(f"=== TUMOR SEGMENTATION URL DEBUG for Task {obj.id} ===")
+        print(f"Task {obj.id} - Serializing tumor_segmentation: name='{obj.tumor_segmentation.name if obj.tumor_segmentation else None}', field_exists={bool(obj.tumor_segmentation)}")
+        
         if obj.tumor_segmentation:
-            request = self.context.get('request')
-            url = obj.tumor_segmentation.url
-            logger.info(f"Task {obj.id} - tumor_segmentation.url: '{url}'")
-            return request.build_absolute_uri(url) if request else url
-        return None
+            try:
+                request = self.context.get('request')
+                print(f"Task {obj.id} - Request context available: {bool(request)}")
+                
+                url = obj.tumor_segmentation.url
+                print(f"Task {obj.id} - tumor_segmentation.url: '{url}'")
+                
+                if request:
+                    absolute_url = request.build_absolute_uri(url)
+                    print(f"Task {obj.id} - Final absolute URL: '{absolute_url}'")
+                    return absolute_url
+                else:
+                    print(f"Task {obj.id} - No request context, returning relative URL: '{url}'")
+                    return url
+            except Exception as e:
+                print(f"Task {obj.id} - Error generating tumor segmentation URL: {str(e)}")
+                return None
+        else:
+            print(f"Task {obj.id} - tumor_segmentation field is empty or None")
+            return None
     
     def get_lung_segmentation_url(self, obj):
-        logger.info(f"Task {obj.id} - Serializing lung_segmentation: name='{obj.lung_segmentation.name if obj.lung_segmentation else None}', field_exists={bool(obj.lung_segmentation)}")
+        print(f"=== LUNG SEGMENTATION URL DEBUG for Task {obj.id} ===")
+        print(f"Task {obj.id} - Serializing lung_segmentation: name='{obj.lung_segmentation.name if obj.lung_segmentation else None}', field_exists={bool(obj.lung_segmentation)}")
+        
         if obj.lung_segmentation:
-            request = self.context.get('request')
-            url = obj.lung_segmentation.url
-            logger.info(f"Task {obj.id} - lung_segmentation.url: '{url}'")
-            return request.build_absolute_uri(url) if request else url
-        return None
+            try:
+                request = self.context.get('request')
+                print(f"Task {obj.id} - Request context available: {bool(request)}")
+                
+                url = obj.lung_segmentation.url
+                print(f"Task {obj.id} - lung_segmentation.url: '{url}'")
+                
+                if request:
+                    absolute_url = request.build_absolute_uri(url)
+                    print(f"Task {obj.id} - Final absolute URL: '{absolute_url}'")
+                    return absolute_url
+                else:
+                    print(f"Task {obj.id} - No request context, returning relative URL: '{url}'")
+                    return url
+            except Exception as e:
+                print(f"Task {obj.id} - Error generating lung segmentation URL: {str(e)}")
+                return None
+        else:
+            print(f"Task {obj.id} - lung_segmentation field is empty or None")
+            return None
     
     def get_nifti_file_url(self, obj):
-        logger.info(f"Task {obj.id} - Serializing nifti_file: name='{obj.nifti_file.name if obj.nifti_file else None}', field_exists={bool(obj.nifti_file)}")
+        print(f"=== NIFTI FILE URL DEBUG for Task {obj.id} ===")
+        print(f"Task {obj.id} - Serializing nifti_file: name='{obj.nifti_file.name if obj.nifti_file else None}', field_exists={bool(obj.nifti_file)}")
+        
         if obj.nifti_file:
-            request = self.context.get('request')
-            url = obj.nifti_file.url
-            logger.info(f"Task {obj.id} - nifti_file.url: '{url}'")
-            return request.build_absolute_uri(url) if request else url
-        return None
+            try:
+                request = self.context.get('request')
+                print(f"Task {obj.id} - Request context available: {bool(request)}")
+                
+                url = obj.nifti_file.url
+                print(f"Task {obj.id} - nifti_file.url: '{url}'")
+                
+                if request:
+                    absolute_url = request.build_absolute_uri(url)
+                    print(f"Task {obj.id} - Final absolute URL: '{absolute_url}'")
+                    return absolute_url
+                else:
+                    print(f"Task {obj.id} - No request context, returning relative URL: '{url}'")
+                    return url
+            except Exception as e:
+                print(f"Task {obj.id} - Error generating nifti file URL: {str(e)}")
+                return None
+        else:
+            print(f"Task {obj.id} - nifti_file field is empty or None")
+            return None

@@ -259,6 +259,23 @@ export function useFileProcessing() {
             const lungSegUrl = statusResponse.data.lung_segmentation_url;
             const originalNiftiUrl = statusResponse.data.nifti_file_url;
 
+            // Debug: Log all received URLs
+            console.log("=== RECEIVED URLs FROM BACKEND ===");
+            console.log("Full API response:", statusResponse.data);
+            console.log("Original NIFTI URL:", originalNiftiUrl);
+            console.log("Tumor segmentation URL:", tumorSegUrl);
+            console.log("Lung segmentation URL:", lungSegUrl);
+            console.log("URL types:", {
+              originalNiftiUrl: typeof originalNiftiUrl,
+              tumorSegUrl: typeof tumorSegUrl,
+              lungSegUrl: typeof lungSegUrl
+            });
+            console.log("URL truthiness:", {
+              originalNiftiUrl: !!originalNiftiUrl,
+              tumorSegUrl: !!tumorSegUrl,
+              lungSegUrl: !!lungSegUrl
+            });
+
             // Create a result object with the data needed by your viewers
             const result = {
               success: true,
@@ -273,6 +290,9 @@ export function useFileProcessing() {
                 confidenceScore: statusResponse.data.confidence_score
               }
             };
+            
+            console.log("=== FINAL RESULT OBJECT ===");
+            console.log("Result object:", result);
             
             setSegmentationResult(result);
           } else if (statusResponse.data.status === "failed") {

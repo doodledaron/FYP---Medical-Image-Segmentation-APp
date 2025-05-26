@@ -53,9 +53,11 @@ class SegmentationTask(models.Model):
     nifti_file = models.FileField(upload_to=nifti_file_path, storage=WSLCompatibleFileStorage())
     status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued')
     tumor_segmentation = models.FileField(upload_to=tumor_segmentation_path,
-                                      max_length=255, null=True, blank=True)
+                                      max_length=255, null=True, blank=True,
+                                      storage=WSLCompatibleFileStorage())
     lung_segmentation = models.FileField(upload_to=lung_segmentation_path,
-                                      max_length=255, null=True, blank=True)
+                                      max_length=255, null=True, blank=True,
+                                      storage=WSLCompatibleFileStorage())
     error          = models.TextField(null=True, blank=True)
     created_at     = models.DateTimeField(auto_now_add=True)
     updated_at     = models.DateTimeField(auto_now=True)
