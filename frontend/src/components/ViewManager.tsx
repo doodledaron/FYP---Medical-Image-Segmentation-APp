@@ -174,6 +174,7 @@ export function ViewManager({ currentView, setCurrentView }: ViewManagerProps) {
             showManualSegmentation={fileProcessing.showManualSegmentation}
             completeManualSegmentation={fileProcessing.completeManualSegmentation}
             isMockData={fileProcessing.isMockData}
+            processingProgress={fileProcessing.processingProgress}
           />
         )}
       </main>

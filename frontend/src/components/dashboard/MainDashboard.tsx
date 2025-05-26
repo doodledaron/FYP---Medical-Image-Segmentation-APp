@@ -1,6 +1,6 @@
 // src/components/dashboard/MainDashboard.tsx
 import React, { useState, useEffect } from 'react';
-import { Brain, Eye, Loader2, MousePointer2, Maximize, RotateCcw, FileSymlink, Settings, Layers, Check, CheckSquare, Square, BookOpen, Clock, Upload } from 'lucide-react';
+import { Brain, Eye, Loader2, MousePointer2, Maximize, RotateCcw, FileSymlink, Settings, Layers, Check, CheckSquare, Square, BookOpen, Clock, Upload, AlertCircle } from 'lucide-react';
 import { FileUpload } from '../common/FileUpload';
 import { Viewer3D } from '../viewer/Viewer3D';
 import NiftiViewer from '../viewer/NiftiViewer';
@@ -21,6 +21,13 @@ interface MainDashboardProps {
   showManualSegmentation: boolean;
   completeManualSegmentation: (segData: any) => void;
   isMockData: boolean;
+  processingProgress?: {
+    currentAttempt: number;
+    maxAttempts: number;
+    elapsedMinutes: number;
+    estimatedRemainingMinutes: number;
+    status: string;
+  } | null;
 }
 
 // TNM Fun Facts for loading screen
@@ -86,7 +93,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   handleSegmentationChoice,
   showManualSegmentation,
   completeManualSegmentation,
-  isMockData
+  isMockData,
+  processingProgress
 }) => {
   // key to force remount of Viewer3D (simulates hot-reload)
   const [reloadKey, setReloadKey] = useState(0);
@@ -360,17 +368,43 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 'Processing your medical scan (5-10 minutes)...'}
             </div>
             
-            {/* Progress indicator */}
+            {/* Enhanced Progress indicator with detailed info */}
             <div className="w-full max-w-md mx-auto mb-8">
               <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-blue-600 rounded-full animate-pulse" 
                   style={{
-                    width: isMockData ? '70%' : '30%',
+                    width: processingProgress ? 
+                      `${(processingProgress.currentAttempt / processingProgress.maxAttempts) * 100}%` :
+                      (isMockData ? '70%' : '30%'),
                     animationDuration: isMockData ? '1s' : '3s'
                   }}
                 ></div>
               </div>
+              
+              {/* Detailed progress info */}
+              {processingProgress && (
+                <div className="mt-4 space-y-2 text-sm text-gray-600">
+                  <div className="flex justify-between">
+                    <span>Status:</span>
+                    <span className="font-medium capitalize">{processingProgress.status}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Progress:</span>
+                    <span className="font-medium">
+                      {processingProgress.currentAttempt} / {processingProgress.maxAttempts} checks
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Elapsed:</span>
+                    <span className="font-medium">{processingProgress.elapsedMinutes.toFixed(1)} min</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Est. remaining:</span>
+                    <span className="font-medium">{processingProgress.estimatedRemainingMinutes.toFixed(1)} min</span>
+                  </div>
+                </div>
+              )}
             </div>
             
             {/* Enhanced Fun Fact Card */}
@@ -397,7 +431,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         )}
 
         {/* Results Section with Improved Organization */}
-        {file && segmentationResult && !loading && !showSegmentationChoice && (
+        {file && segmentationResult && segmentationResult.success && !loading && !showSegmentationChoice && (
           <div className="bg-white rounded-xl shadow-sm p-8">
             {/* Header with Clear Visual Hierarchy */}
             <div className="flex justify-between items-center mb-8 pb-6 border-b border-gray-100">
@@ -660,6 +694,33 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Error Section for Failed Segmentation */}
+        {file && segmentationResult && !segmentationResult.success && !loading && !showSegmentationChoice && (
+          <div className="bg-white rounded-xl shadow-sm p-8">
+            <div className="text-center">
+              <div className="bg-red-50 rounded-xl p-6">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="bg-red-100 rounded-full p-3">
+                    <AlertCircle className="h-8 w-8 text-red-600" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-semibold text-red-900 mb-2">Segmentation Failed</h3>
+                <p className="text-red-700 mb-4">
+                  {segmentationResult.error || "An error occurred during processing"}
+                </p>
+                <button
+                  onClick={() => {
+                    handleFileSelect(file);
+                  }}
+                  className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all"
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
           </div>
         )}

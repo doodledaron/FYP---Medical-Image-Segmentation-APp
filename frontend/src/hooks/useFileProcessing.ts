@@ -335,7 +335,9 @@ export function useFileProcessing() {
             console.log("Result object:", result);
             
             setSegmentationResult(result);
+            setLoading(false); // Only set loading to false when we have results
           } else if (statusResponse.data.status === "failed") {
+            setLoading(false); // Set loading to false on failure
             throw new Error(statusResponse.data.error || "Processing failed");
           } else if (statusResponse.data.status === "processing") {
             // Task is still processing, continue polling
@@ -352,12 +354,14 @@ export function useFileProcessing() {
           if (attempts % 10 === 0) {
             console.log("Continuing to poll despite error...");
           }
+          // Don't set segmentationResult here - continue polling
         }
       }
 
       if (!taskComplete) {
         const totalMinutes = (maxAttempts * pollingInterval) / 1000 / 60;
         setProcessingProgress(null); // Clear progress state
+        setLoading(false); // Set loading to false on timeout
         throw new Error(`Task processing timed out after ${totalMinutes} minutes. The segmentation may still be running on the server.`);
       }
     } catch (error) {
@@ -365,6 +369,7 @@ export function useFileProcessing() {
       
       // Clear progress state on error
       setProcessingProgress(null);
+      setLoading(false); // Set loading to false on error
       
       // More detailed error reporting
       let errorMessage = "Failed to process file";
@@ -383,6 +388,7 @@ export function useFileProcessing() {
         errorMessage = error.message;
       }
       
+      // Only set segmentationResult on actual processing failures, not polling errors
       setSegmentationResult({ 
         success: false, 
         error: errorMessage,
@@ -397,8 +403,6 @@ export function useFileProcessing() {
           confidenceScore: 0
         }
       });
-    } finally {
-      setLoading(false);
     }
   };
 
