@@ -259,12 +259,6 @@ export function useFileProcessing() {
             const lungSegUrl = statusResponse.data.lung_segmentation_url;
             const originalNiftiUrl = statusResponse.data.nifti_file_url;
 
-            // Debug: Log the URLs received from the API
-            console.log("URLs received from API:");
-            console.log("  - Tumor segmentation URL:", tumorSegUrl);
-            console.log("  - Lung segmentation URL:", lungSegUrl);
-            console.log("  - Original NIFTI URL:", originalNiftiUrl);
-
             // Create a result object with the data needed by your viewers
             const result = {
               success: true,
@@ -280,7 +274,6 @@ export function useFileProcessing() {
               }
             };
             
-            console.log("Final result object:", result);
             setSegmentationResult(result);
           } else if (statusResponse.data.status === "failed") {
             throw new Error(statusResponse.data.error || "Processing failed");

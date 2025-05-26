@@ -124,11 +124,11 @@ def process_segmentation_task(task_id):
             print(f"Processing {field_name}...")
             old_file = getattr(task, field_name)
             if old_file:
-                old_file_path = old_file.path if hasattr(old_file, 'path') else None
+                old_file_path = old_file.path
                 print(f"Found old {field_name} file: {old_file_path}")
                 old_file.delete(save=False)
                 # Only delete the old file if it's different from the new one
-                if old_file_path and os.path.exists(old_file_path) and old_file_path != result_files[field_name]:
+                if os.path.exists(old_file_path) and old_file_path != result_files[field_name]:
                     try:
                         os.remove(old_file_path)
                         print(f"✓ Removed old {field_name} file: {old_file_path}")
@@ -137,69 +137,12 @@ def process_segmentation_task(task_id):
             else:
                 print(f"No old {field_name} file to remove")
         
-        # Update the task with the file paths - use proper Django FileField assignment
+        # Update the task with the file paths
         print(f"Updating task with new file paths...")
-        
-        # Proper way to assign files to Django FileFields
-        # Open the files and assign them using Django's File wrapper
-        with open(result_files['tumor_segmentation'], 'rb') as tumor_file:
-            task.tumor_segmentation.save(
-                os.path.basename(result_files['tumor_segmentation']),
-                File(tumor_file),
-                save=False
-            )
-        
-        with open(result_files['lung_segmentation'], 'rb') as lung_file:
-            task.lung_segmentation.save(
-                os.path.basename(result_files['lung_segmentation']),
-                File(lung_file),
-                save=False
-            )
-        
-        # Debug: Print the assigned paths
-        print(f"Assigned tumor segmentation path: {task.tumor_segmentation.name}")
-        print(f"Assigned lung segmentation path: {task.lung_segmentation.name}")
-        
-        # Verify the files actually exist at the assigned paths
-        tumor_full_path = task.tumor_segmentation.path if task.tumor_segmentation else None
-        lung_full_path = task.lung_segmentation.path if task.lung_segmentation else None
-        
-        print(f"Checking tumor file exists at: {tumor_full_path}")
-        print(f"Tumor file exists: {os.path.exists(tumor_full_path) if tumor_full_path else False}")
-        print(f"Checking lung file exists at: {lung_full_path}")
-        print(f"Lung file exists: {os.path.exists(lung_full_path) if lung_full_path else False}")
-        
-        # Save the task with updated file references
-        task.save()
+        task.tumor_segmentation.name = media_relative_paths['tumor_segmentation']
+        task.lung_segmentation.name = media_relative_paths['lung_segmentation']
+        task.save(update_fields=['tumor_segmentation', 'lung_segmentation', 'updated_at'])
         print(f"✓ Task updated with new file paths")
-        
-        # Force database commit to ensure changes are persisted
-        from django.db import transaction
-        transaction.commit()
-        
-        # Refresh task from database to ensure FileFields are properly loaded
-        task.refresh_from_db()
-        print(f"✓ Task refreshed from database")
-        
-        # Verify the file URLs can be generated
-        try:
-            print(f"=== POST-REFRESH URL VERIFICATION ===")
-            print(f"Tumor segmentation field: {task.tumor_segmentation}")
-            print(f"Tumor segmentation name: {task.tumor_segmentation.name if task.tumor_segmentation else 'None'}")
-            print(f"Tumor segmentation name bool: {bool(task.tumor_segmentation.name) if task.tumor_segmentation else False}")
-            
-            print(f"Lung segmentation field: {task.lung_segmentation}")
-            print(f"Lung segmentation name: {task.lung_segmentation.name if task.lung_segmentation else 'None'}")
-            print(f"Lung segmentation name bool: {bool(task.lung_segmentation.name) if task.lung_segmentation else False}")
-            
-            tumor_url = task.tumor_segmentation.url if task.tumor_segmentation and task.tumor_segmentation.name else 'None'
-            lung_url = task.lung_segmentation.url if task.lung_segmentation and task.lung_segmentation.name else 'None'
-            print(f"Tumor segmentation URL: {tumor_url}")
-            print(f"Lung segmentation URL: {lung_url}")
-        except Exception as url_error:
-            print(f"❌ Error generating URLs: {str(url_error)}")
-            import traceback
-            print(f"URL generation error traceback:\n{traceback.format_exc()}")
         
         print(f"=== VERIFYING SAVED FILES ===")
         # Verify the saved files can be loaded with nibabel
@@ -217,12 +160,12 @@ def process_segmentation_task(task_id):
         # Set task to completed with metrics
         try:
             print(f"Analyzing tumor segmentation...")
-            # Analyze both segmentations using the original result files
-            tumor_metrics = nnunet_handler.analyze_segmentation(result_files['tumor_segmentation'])
+            # Analyze both segmentations
+            tumor_metrics = nnunet_handler.analyze_segmentation(task.tumor_segmentation.path)
             print(f"Tumor metrics: {tumor_metrics}")
             
             print(f"Analyzing lung segmentation...")
-            lung_metrics = nnunet_handler.analyze_segmentation(result_files['lung_segmentation'])
+            lung_metrics = nnunet_handler.analyze_segmentation(task.lung_segmentation.path)
             print(f"Lung metrics: {lung_metrics}")
             
             # Update task with combined metrics
@@ -239,18 +182,9 @@ def process_segmentation_task(task_id):
         
         print(f"=== FINALIZING TASK ===")
         task.status = 'completed'
-        # Save all fields to ensure file references are preserved
-        task.save()
-        
-        # Force another database commit
-        transaction.commit()
-        
-        # Final verification that files are still assigned
-        task.refresh_from_db()
-        print(f"=== FINAL VERIFICATION ===")
-        print(f"Final tumor segmentation name: {task.tumor_segmentation.name if task.tumor_segmentation else 'None'}")
-        print(f"Final lung segmentation name: {task.lung_segmentation.name if task.lung_segmentation else 'None'}")
-        
+        task.save(update_fields=['status', 'updated_at',
+                                 'tumor_volume', 'lung_volume',
+                                 'lesion_count', 'confidence_score'])
         print(f"✓ Task {task_id} completed successfully")
         print(f"=== SEGMENTATION TASK {task_id} COMPLETED ===")
         

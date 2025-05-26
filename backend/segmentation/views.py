@@ -173,30 +173,9 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             print(f"  - Has tumor segmentation: {bool(instance.tumor_segmentation)}")
             print(f"  - Has lung segmentation: {bool(instance.lung_segmentation)}")
             
-            # Debug FileField details
-            if instance.tumor_segmentation:
-                print(f"  - Tumor segmentation name: {instance.tumor_segmentation.name}")
-                print(f"  - Tumor segmentation name bool: {bool(instance.tumor_segmentation.name)}")
-            else:
-                print(f"  - Tumor segmentation is None/empty")
-                
-            if instance.lung_segmentation:
-                print(f"  - Lung segmentation name: {instance.lung_segmentation.name}")
-                print(f"  - Lung segmentation name bool: {bool(instance.lung_segmentation.name)}")
-            else:
-                print(f"  - Lung segmentation is None/empty")
-            
             serializer = self.get_serializer(instance, context={'request': request})
-            
-            # Debug: print the serialized data to check URLs
-            serialized_data = serializer.data
-            print(f"Serialized response data for retrieve:")
-            print(f"  - tumor_segmentation_url: {serialized_data.get('tumor_segmentation_url')}")
-            print(f"  - lung_segmentation_url: {serialized_data.get('lung_segmentation_url')}")
-            print(f"  - nifti_file_url: {serialized_data.get('nifti_file_url')}")
-            
             print(f"✓ Task serialized successfully")
-            return Response(serialized_data)
+            return Response(serializer.data)
         except Exception as e:
             print(f"❌ ERROR: Failed to retrieve task: {str(e)}")
             logger.error(f"Error retrieving task: {e}")
@@ -225,19 +204,6 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             print(f"  - Created: {task.created_at}")
             print(f"  - Updated: {task.updated_at}")
             print(f"  - Error: {task.error if hasattr(task, 'error') else 'None'}")
-            
-            # Debug FileField details
-            if task.tumor_segmentation:
-                print(f"  - Tumor segmentation name: {task.tumor_segmentation.name}")
-                print(f"  - Tumor segmentation name bool: {bool(task.tumor_segmentation.name)}")
-            else:
-                print(f"  - Tumor segmentation is None/empty")
-                
-            if task.lung_segmentation:
-                print(f"  - Lung segmentation name: {task.lung_segmentation.name}")
-                print(f"  - Lung segmentation name bool: {bool(task.lung_segmentation.name)}")
-            else:
-                print(f"  - Lung segmentation is None/empty")
             
             # Check if both segmentation files exist when the task is completed
             if task.status == 'completed':
@@ -284,16 +250,8 @@ class SegmentationTaskViewSet(viewsets.ModelViewSet):
             # Add context={'request': request} to pass the request to the serializer
             print(f"Serializing task for response...")
             serializer = self.get_serializer(task, context={'request': request})
-            
-            # Debug: print the serialized data to check URLs
-            serialized_data = serializer.data
-            print(f"Serialized response data:")
-            print(f"  - tumor_segmentation_url: {serialized_data.get('tumor_segmentation_url')}")
-            print(f"  - lung_segmentation_url: {serialized_data.get('lung_segmentation_url')}")
-            print(f"  - nifti_file_url: {serialized_data.get('nifti_file_url')}")
-            
             print(f"✓ Status check completed successfully")
-            return Response(serialized_data)
+            return Response(serializer.data)
         except SegmentationTask.DoesNotExist:
             print(f"❌ ERROR: Task {pk} not found in database")
             return Response(
