@@ -148,47 +148,89 @@ def process_segmentation_task(task_id):
         print(f"Tumor relative path: {tumor_relative_path}")
         print(f"Lung relative path: {lung_relative_path}")
         
-        # For tumor segmentation - read the file and save it through Django
-        print(f"Reading tumor segmentation file: {result_files['tumor_segmentation']}")
-        with open(result_files['tumor_segmentation'], 'rb') as f:
-            tumor_content = f.read()
-            tumor_filename = os.path.basename(result_files['tumor_segmentation'])
-            print(f"Tumor filename: {tumor_filename}, content size: {len(tumor_content)} bytes")
+        try:
+            # For tumor segmentation - read the file and save it through Django
+            print(f"=== STARTING TUMOR SEGMENTATION FILE SAVE ===")
+            print(f"Reading tumor segmentation file: {result_files['tumor_segmentation']}")
+            print(f"File exists: {os.path.exists(result_files['tumor_segmentation'])}")
             
-            # Clear any existing file first
-            if task.tumor_segmentation:
-                task.tumor_segmentation.delete(save=False)
-            
-            # Save the new file
-            task.tumor_segmentation.save(tumor_filename, ContentFile(tumor_content), save=False)
-            print(f"✓ Tumor segmentation saved: {task.tumor_segmentation.name}")
+            with open(result_files['tumor_segmentation'], 'rb') as f:
+                tumor_content = f.read()
+                tumor_filename = os.path.basename(result_files['tumor_segmentation'])
+                print(f"Tumor filename: {tumor_filename}, content size: {len(tumor_content)} bytes")
+                
+                # Clear any existing file first
+                if task.tumor_segmentation:
+                    print(f"Clearing existing tumor segmentation file")
+                    task.tumor_segmentation.delete(save=False)
+                
+                # Save the new file
+                print(f"Saving tumor segmentation file...")
+                task.tumor_segmentation.save(tumor_filename, ContentFile(tumor_content), save=False)
+                print(f"✓ Tumor segmentation saved: {task.tumor_segmentation.name}")
+                print(f"Tumor segmentation field after save: {bool(task.tumor_segmentation)}")
+                print(f"Tumor segmentation name after save: '{task.tumor_segmentation.name}'")
+        except Exception as tumor_error:
+            print(f"❌ ERROR saving tumor segmentation: {str(tumor_error)}")
+            import traceback
+            print(f"Tumor save error traceback:\n{traceback.format_exc()}")
         
-        # For lung segmentation - read the file and save it through Django  
-        print(f"Reading lung segmentation file: {result_files['lung_segmentation']}")
-        with open(result_files['lung_segmentation'], 'rb') as f:
-            lung_content = f.read()
-            lung_filename = os.path.basename(result_files['lung_segmentation'])
-            print(f"Lung filename: {lung_filename}, content size: {len(lung_content)} bytes")
+        try:
+            # For lung segmentation - read the file and save it through Django  
+            print(f"=== STARTING LUNG SEGMENTATION FILE SAVE ===")
+            print(f"Reading lung segmentation file: {result_files['lung_segmentation']}")
+            print(f"File exists: {os.path.exists(result_files['lung_segmentation'])}")
             
-            # Clear any existing file first
-            if task.lung_segmentation:
-                task.lung_segmentation.delete(save=False)
-            
-            # Save the new file
-            task.lung_segmentation.save(lung_filename, ContentFile(lung_content), save=False)
-            print(f"✓ Lung segmentation saved: {task.lung_segmentation.name}")
+            with open(result_files['lung_segmentation'], 'rb') as f:
+                lung_content = f.read()
+                lung_filename = os.path.basename(result_files['lung_segmentation'])
+                print(f"Lung filename: {lung_filename}, content size: {len(lung_content)} bytes")
+                
+                # Clear any existing file first
+                if task.lung_segmentation:
+                    print(f"Clearing existing lung segmentation file")
+                    task.lung_segmentation.delete(save=False)
+                
+                # Save the new file
+                print(f"Saving lung segmentation file...")
+                task.lung_segmentation.save(lung_filename, ContentFile(lung_content), save=False)
+                print(f"✓ Lung segmentation saved: {task.lung_segmentation.name}")
+                print(f"Lung segmentation field after save: {bool(task.lung_segmentation)}")
+                print(f"Lung segmentation name after save: '{task.lung_segmentation.name}'")
+        except Exception as lung_error:
+            print(f"❌ ERROR saving lung segmentation: {str(lung_error)}")
+            import traceback
+            print(f"Lung save error traceback:\n{traceback.format_exc()}")
         
         # Save the task with updated file references
-        task.save(update_fields=['tumor_segmentation', 'lung_segmentation', 'updated_at'])
-        print(f"✓ Task updated with new file paths")
+        print(f"=== SAVING TASK TO DATABASE ===")
+        try:
+            task.save(update_fields=['tumor_segmentation', 'lung_segmentation', 'updated_at'])
+            print(f"✓ Task updated with new file paths")
+        except Exception as save_error:
+            print(f"❌ ERROR saving task to database: {str(save_error)}")
+            import traceback
+            print(f"Task save error traceback:\n{traceback.format_exc()}")
         
         # Verify the FileField names are set correctly
+        print(f"=== FINAL VERIFICATION ===")
         print(f"Final tumor_segmentation.name: '{task.tumor_segmentation.name}'")
         print(f"Final lung_segmentation.name: '{task.lung_segmentation.name}'")
-        print(f"Tumor segmentation file exists: {os.path.exists(task.tumor_segmentation.path) if task.tumor_segmentation.name else False}")
-        print(f"Lung segmentation file exists: {os.path.exists(task.lung_segmentation.path) if task.lung_segmentation.name else False}")
+        print(f"Final tumor_segmentation bool: {bool(task.tumor_segmentation)}")
+        print(f"Final lung_segmentation bool: {bool(task.lung_segmentation)}")
+        
+        if task.tumor_segmentation.name:
+            print(f"Tumor segmentation file exists: {os.path.exists(task.tumor_segmentation.path)}")
+        else:
+            print(f"Tumor segmentation name is empty - cannot check file existence")
+            
+        if task.lung_segmentation.name:
+            print(f"Lung segmentation file exists: {os.path.exists(task.lung_segmentation.path)}")
+        else:
+            print(f"Lung segmentation name is empty - cannot check file existence")
         
         # Clean up the original files since we've copied them to Django's managed location
+        print(f"=== CLEANING UP ORIGINAL FILES ===")
         try:
             if os.path.exists(result_files['tumor_segmentation']):
                 os.remove(result_files['tumor_segmentation'])
