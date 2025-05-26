@@ -225,13 +225,16 @@ export function useFileProcessing() {
   const startAISegmentation = async (): Promise<void> => {
     if (!file) return;
     
+    console.log("=== STARTING AI SEGMENTATION ===");
     setLoading(true);
     
     try {
+      console.log("Creating form data for file upload...");
       // Create form data for the file upload
       const formData = new FormData();
       formData.append("nifti_file", file);
 
+      console.log("Sending file to Django API...");
       // Send the file to the Django API with increased timeout
       const response = await axios.post(`${API_URL}/tasks/`, formData, {
         headers: {
@@ -241,6 +244,7 @@ export function useFileProcessing() {
       });
 
       const taskId = response.data.task_id;
+      console.log(`Task created with ID: ${taskId}`);
 
       // Poll for task completion with longer timeout
       let taskComplete = false;
@@ -251,8 +255,10 @@ export function useFileProcessing() {
       console.log(`Starting polling for task ${taskId}. Max attempts: ${maxAttempts}, interval: ${pollingInterval}ms`);
       console.log(`Maximum wait time: ${(maxAttempts * pollingInterval) / 1000 / 60} minutes`);
 
+      console.log("=== ENTERING POLLING LOOP ===");
       while (!taskComplete && attempts < maxAttempts) {
         attempts++;
+        console.log(`--- Polling attempt ${attempts}/${maxAttempts} ---`);
         
         // Update progress state
         const elapsedMinutes = (attempts * pollingInterval) / 1000 / 60;
@@ -271,8 +277,10 @@ export function useFileProcessing() {
           console.log(`Polling attempt ${attempts}/${maxAttempts} (${elapsedMinutes.toFixed(1)} min elapsed, ${remainingMinutes.toFixed(1)} min remaining)`);
         }
         
+        console.log(`Waiting ${pollingInterval}ms before next status check...`);
         await new Promise(resolve => setTimeout(resolve, pollingInterval));
 
+        console.log(`Making status check request for attempt ${attempts}...`);
         try {
           // Check task status with timeout
           const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/`, {
@@ -288,6 +296,7 @@ export function useFileProcessing() {
           } : null);
 
           if (statusResponse.data.status === "completed") {
+            console.log("🎉 TASK COMPLETED! Processing final result...");
             taskComplete = true;
             console.log(`Task completed after ${attempts} attempts (${(attempts * pollingInterval) / 1000 / 60} minutes)`);
             
@@ -334,9 +343,13 @@ export function useFileProcessing() {
             console.log("=== FINAL RESULT OBJECT ===");
             console.log("Result object:", result);
             
+            console.log("Setting segmentation result and loading to false...");
             setSegmentationResult(result);
             setLoading(false); // Only set loading to false when we have results
+            console.log("✅ AI SEGMENTATION COMPLETED SUCCESSFULLY");
+            return; // Exit the function successfully
           } else if (statusResponse.data.status === "failed") {
+            console.log("❌ TASK FAILED on the server");
             setLoading(false); // Set loading to false on failure
             throw new Error(statusResponse.data.error || "Processing failed");
           } else if (statusResponse.data.status === "processing") {
@@ -344,28 +357,38 @@ export function useFileProcessing() {
             if (attempts % 20 === 0) { // Log every minute
               console.log(`Task still processing... (${(attempts * pollingInterval) / 1000 / 60} minutes elapsed)`);
             }
+            console.log(`Status is 'processing', continuing to poll...`);
           } else {
             // Unknown status
-            console.log(`Unknown task status: ${statusResponse.data.status}`);
+            console.log(`Unknown task status: ${statusResponse.data.status}, continuing to poll...`);
           }
         } catch (pollError) {
-          console.error(`Error during polling attempt ${attempts}:`, pollError);
+          console.error(`❌ Error during polling attempt ${attempts}:`, pollError);
           // Continue polling despite error, but log it
           if (attempts % 10 === 0) {
             console.log("Continuing to poll despite error...");
           }
-          // Don't set segmentationResult here - continue polling
+          console.log(`Polling error handled, continuing to next attempt...`);
+          // Don't throw or set any states here - just continue polling
+          // The outer catch block should only catch non-polling errors
         }
+        
+        console.log(`--- End of polling attempt ${attempts} ---`);
       }
 
+      console.log("=== EXITED POLLING LOOP ===");
+      // Only reach here if polling timed out
       if (!taskComplete) {
+        console.log("⏰ POLLING TIMED OUT");
         const totalMinutes = (maxAttempts * pollingInterval) / 1000 / 60;
         setProcessingProgress(null); // Clear progress state
         setLoading(false); // Set loading to false on timeout
         throw new Error(`Task processing timed out after ${totalMinutes} minutes. The segmentation may still be running on the server.`);
       }
     } catch (error) {
-      console.error("Error processing file:", error);
+      console.error("💥 ERROR IN AI SEGMENTATION FUNCTION:", error);
+      console.error("Error type:", typeof error);
+      console.error("Error constructor:", error?.constructor?.name);
       
       // Clear progress state on error
       setProcessingProgress(null);
@@ -374,6 +397,7 @@ export function useFileProcessing() {
       // More detailed error reporting
       let errorMessage = "Failed to process file";
       if (axios.isAxiosError(error)) {
+        console.log("This is an Axios error");
         if (error.code === 'ECONNABORTED') {
           errorMessage = "Request timed out. The server might be busy or the file is too large.";
         } else if (error.response) {
@@ -385,8 +409,12 @@ export function useFileProcessing() {
           errorMessage = "No response received from server. Check your network connection.";
         }
       } else if (error instanceof Error) {
+        console.log("This is a standard Error");
         errorMessage = error.message;
       }
+      
+      console.log("Final error message:", errorMessage);
+      console.log("Setting failed segmentation result...");
       
       // Only set segmentationResult on actual processing failures, not polling errors
       setSegmentationResult({ 
@@ -403,7 +431,11 @@ export function useFileProcessing() {
           confidenceScore: 0
         }
       });
+      
+      console.log("❌ AI SEGMENTATION FAILED");
     }
+    
+    console.log("=== AI SEGMENTATION FUNCTION ENDED ===");
   };
 
   const completeManualSegmentation = (segData: any) => {
