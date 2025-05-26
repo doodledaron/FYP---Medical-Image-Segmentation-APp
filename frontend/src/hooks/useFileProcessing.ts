@@ -113,8 +113,12 @@ export function useFileProcessing() {
   }, []);
 
   const handleFileSelect = async (selectedFile: File | null): Promise<void> => {
+    console.log("=== HANDLE FILE SELECT ===");
+    console.log("Selected file:", selectedFile);
+    
     // Handle clearing the file
     if (!selectedFile) {
+      console.log("Clearing file selection");
       setFile(null);
       setSegmentationResult(null);
       setShowSegmentationChoice(false);
@@ -126,6 +130,8 @@ export function useFileProcessing() {
 
     // If this is a mock file, set isMockData flag
     const isMock = selectedFile.name.includes('mock');
+    console.log(`File name: ${selectedFile.name}`);
+    console.log(`Is mock file: ${isMock}`);
     setIsMockData(isMock);
     
     // If this is a mock file and we have a preloaded version, use that
@@ -133,21 +139,29 @@ export function useFileProcessing() {
       console.log("Using preloaded mock file with size:", PRELOADED_MOCK_FILE.size);
       setFile(PRELOADED_MOCK_FILE);
     } else {
+      console.log("Using uploaded file");
       setFile(selectedFile);
     }
     
     setSegmentationResult(null);
     setShowSegmentationChoice(true);
     setSegmentationMode(null);
+    console.log("=== FILE SELECT COMPLETED ===");
   };
 
   const handleSegmentationChoice = (mode: "manual" | "ai"): void => {
+    console.log("=== HANDLE SEGMENTATION CHOICE ===");
+    console.log("Selected mode:", mode);
+    console.log("Current isMockData state:", isMockData);
+    console.log("Current file:", file?.name);
+    
     setSegmentationMode(mode);
     setShowSegmentationChoice(false);
     
     if (mode === "manual") {
       // For mock data, use directUrl approach
       if (isMockData) {
+        console.log("Entering manual segmentation with mock data");
         // Set mock URL directly for manual segmentation
         console.log("Setting direct URL for manual segmentation with mock data");
         console.log("Mock URL path:", MOCK_DATA.originalNiftiUrl);
@@ -162,17 +176,22 @@ export function useFileProcessing() {
         // The directUrl will be passed to the ManualSegmentation component
         setShowManualSegmentation(true);
       } else {
+        console.log("Entering manual segmentation with real data");
         // Real data - proceed with manual segmentation as normal
         setShowManualSegmentation(true);
       }
     } else {
       // For AI segmentation, check if it's mock data
+      console.log("AI segmentation selected");
       if (isMockData) {
+        console.log("🎭 Starting MOCK segmentation");
         startMockSegmentation();
       } else {
+        console.log("🤖 Starting REAL AI segmentation");
         startAISegmentation();
       }
     }
+    console.log("=== SEGMENTATION CHOICE COMPLETED ===");
   };
 
   // New function for mock segmentation
