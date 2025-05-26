@@ -30,6 +30,15 @@ interface MainDashboardProps {
     estimatedRemainingMinutes: number;
     status: string;
   } | null;
+  isProcessingInBackground: boolean;
+  backgroundTaskInfo: {
+    fileName: string;
+    startTime: Date;
+    taskId?: string;
+  } | null;
+  showCompletionNotification: boolean;
+  handleNotificationClick: () => void;
+  dismissNotification: () => void;
 }
 
 // TNM Fun Facts for loading screen
@@ -98,7 +107,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   showManualSegmentation,
   completeManualSegmentation,
   isMockData,
-  processingProgress
+  processingProgress,
+  isProcessingInBackground,
+  backgroundTaskInfo,
+  showCompletionNotification,
+  handleNotificationClick,
+  dismissNotification
 }) => {
   // key to force remount of Viewer3D (simulates hot-reload)
   const [reloadKey, setReloadKey] = useState(0);
@@ -204,6 +218,91 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+      {/* Completion Notification */}
+      {showCompletionNotification && (
+        <div className="fixed top-5 right-5 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-w-sm animate-in slide-in-from-top duration-300">
+          <div className="p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                {segmentationResult?.success ? (
+                  <div className="bg-green-100 rounded-full p-2">
+                    <Check className="h-6 w-6 text-green-600" />
+                  </div>
+                ) : (
+                  <div className="bg-red-100 rounded-full p-2">
+                    <AlertCircle className="h-6 w-6 text-red-600" />
+                  </div>
+                )}
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className={`text-sm font-medium ${segmentationResult?.success ? 'text-green-900' : 'text-red-900'}`}>
+                  {segmentationResult?.success ? 'Segmentation Complete!' : 'Segmentation Failed'}
+                </h3>
+                <p className={`mt-1 text-sm ${segmentationResult?.success ? 'text-green-700' : 'text-red-700'}`}>
+                  {segmentationResult?.success 
+                    ? `Your scan analysis is ready to view`
+                    : segmentationResult?.error || 'Processing failed'
+                  }
+                </p>
+                <div className="mt-3 flex space-x-2">
+                  {segmentationResult?.success && (
+                    <button
+                      onClick={handleNotificationClick}
+                      className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                    >
+                      View Results
+                    </button>
+                  )}
+                  <button
+                    onClick={dismissNotification}
+                    className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Background Processing Indicator */}
+      {isProcessingInBackground && backgroundTaskInfo && (
+        <div className="fixed bottom-5 right-5 bg-white border border-gray-200 rounded-xl shadow-lg z-40 max-w-sm">
+          <div className="p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="bg-blue-100 rounded-full p-2">
+                  <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                </div>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-sm font-medium text-gray-900">Processing in Background</h3>
+                <p className="text-sm text-gray-600 truncate">
+                  {backgroundTaskInfo.fileName}
+                </p>
+                {processingProgress && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>{processingProgress.elapsedMinutes.toFixed(1)} min</span>
+                      <span>{processingProgress.estimatedRemainingMinutes.toFixed(1)} min left</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div 
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                        style={{
+                          width: `${(processingProgress.currentAttempt / processingProgress.maxAttempts) * 100}%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {showToast && (
         <div className="fixed top-5 right-5 bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center animate-in slide-in-from-top duration-300">
@@ -228,6 +327,26 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           onCancel={() => handleFileSelect(null as any)}
           directUrl={isMockData ? '/mock_lung_scan.nii.gz' : undefined}
         />
+      )}
+
+      {/* Background Processing Started Banner */}
+      {isProcessingInBackground && backgroundTaskInfo && !showCompletionNotification && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <div className="bg-blue-100 rounded-full p-2">
+                <Brain className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+            <div className="ml-3 flex-1">
+              <h3 className="text-sm font-medium text-blue-900">AI Segmentation Started</h3>
+              <div className="mt-1 text-sm text-blue-800">
+                <p>Your scan "{backgroundTaskInfo.fileName}" is being processed in the background (5-10 minutes).</p>
+                <p className="mt-1">You can continue exploring other features while waiting. We'll notify you when it's ready!</p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Main Content Area with Card-Based Layout */}
@@ -363,79 +482,38 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
         )}
 
-        {/* Loading State with Fun Facts */}
-        {loading && (
+        {/* Loading State for Initial Upload Only */}
+        {loading && !isProcessingInBackground && (
           <div className="bg-white rounded-xl shadow-sm p-10 text-center">
             <div className="text-gray-900 font-medium text-xl mb-6">
               {isMockData ? 
-                'Processing demo scan (5-10 seconds)...' : 
-                'Processing your medical scan (5-10 minutes)...'}
+                'Loading demo scan...' : 
+                'Uploading your scan...'}
             </div>
             
-            {/* Enhanced Progress indicator with detailed info */}
+            {/* Simple progress indicator for upload */}
             <div className="w-full max-w-md mx-auto mb-8">
               <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-blue-600 rounded-full animate-pulse" 
                   style={{
-                    width: processingProgress ? 
-                      `${(processingProgress.currentAttempt / processingProgress.maxAttempts) * 100}%` :
-                      (isMockData ? '70%' : '30%'),
-                    animationDuration: isMockData ? '1s' : '3s'
+                    width: '60%',
+                    animationDuration: '1s'
                   }}
                 ></div>
               </div>
-              
-              {/* Detailed progress info */}
-              {processingProgress && (
-                <div className="mt-4 space-y-2 text-sm text-gray-600">
-                  <div className="flex justify-between">
-                    <span>Status:</span>
-                    <span className="font-medium capitalize">{processingProgress.status}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Progress:</span>
-                    <span className="font-medium">
-                      {processingProgress.currentAttempt} / {processingProgress.maxAttempts} checks
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Elapsed:</span>
-                    <span className="font-medium">{processingProgress.elapsedMinutes.toFixed(1)} min</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Est. remaining:</span>
-                    <span className="font-medium">{processingProgress.estimatedRemainingMinutes.toFixed(1)} min</span>
-                  </div>
-                </div>
-              )}
             </div>
             
-            {/* Enhanced Fun Fact Card */}
-            <div className="max-w-2xl mx-auto bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 transition-all animate-[fadeIn_0.5s_ease-in]">
-              <div className="flex items-center gap-2 mb-3">
-                <BookOpen className="h-6 w-6 text-blue-600" />
-                <h3 className="font-semibold text-gray-800 text-lg">
-                  TNM Fun Fact: {tnmFunFacts[currentFactIndex].title}
-                </h3>
-              </div>
-              <p className="text-gray-700 text-base">
-                {tnmFunFacts[currentFactIndex].fact}
-              </p>
-              <div className="flex justify-center gap-1 mt-5">
-                {tnmFunFacts.map((_, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`h-2 w-10 rounded-full transition-all duration-300 ${idx === currentFactIndex ? 'bg-blue-600' : 'bg-blue-200'}`}
-                  ></div>
-                ))}
-              </div>
-            </div>
+            <p className="text-gray-600">
+              {isMockData ? 
+                'Preparing demo data...' : 
+                'Your file is being uploaded and will process in the background...'}
+            </p>
           </div>
         )}
 
         {/* Results Section with Improved Organization */}
-        {file && segmentationResult && segmentationResult.success && !loading && !showSegmentationChoice && (
+        {file && segmentationResult && segmentationResult.success && !loading && !showSegmentationChoice && !isProcessingInBackground && !showCompletionNotification && (
           <div className="bg-white rounded-xl shadow-sm p-8">
             {/* Header with Clear Visual Hierarchy */}
             <div className="flex justify-between items-center mb-8 pb-6 border-b border-gray-100">
@@ -703,7 +781,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         )}
 
         {/* Error Section for Failed Segmentation */}
-        {file && segmentationResult && !segmentationResult.success && !loading && !showSegmentationChoice && (
+        {file && segmentationResult && !segmentationResult.success && !loading && !showSegmentationChoice && !isProcessingInBackground && !showCompletionNotification && (
           <div className="bg-white rounded-xl shadow-sm p-8">
             <div className="text-center">
               <div className="bg-red-50 rounded-xl p-6">

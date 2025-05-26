@@ -105,6 +105,15 @@ export function useFileProcessing() {
     status: string;
   } | null>(null);
   
+  // New background processing states
+  const [isProcessingInBackground, setIsProcessingInBackground] = useState<boolean>(false);
+  const [backgroundTaskInfo, setBackgroundTaskInfo] = useState<{
+    fileName: string;
+    startTime: Date;
+    taskId?: string;
+  } | null>(null);
+  const [showCompletionNotification, setShowCompletionNotification] = useState<boolean>(false);
+
   // Also try to load the mock file on component mount
   useEffect(() => {
     if (!PRELOADED_MOCK_FILE) {
@@ -266,7 +275,7 @@ export function useFileProcessing() {
     if (!file) return;
     
     console.log("=== STARTING AI SEGMENTATION ===");
-    setLoading(true);
+    setLoading(true); // Show loading only during initial upload
     
     try {
       console.log("Creating form data for file upload...");
@@ -286,149 +295,21 @@ export function useFileProcessing() {
       const taskId = response.data.task_id;
       console.log(`Task created with ID: ${taskId}`);
 
-      // Poll for task completion with longer timeout
-      let taskComplete = false;
-      let attempts = 0;
-      const maxAttempts = 600; // Increased from 120 to 600 (30 minutes total)
-      const pollingInterval = 3000; // 3 seconds between polls
+      // After successful upload, switch to background mode
+      setLoading(false); // Stop blocking UI
+      setIsProcessingInBackground(true);
+      setBackgroundTaskInfo({
+        fileName: file.name,
+        startTime: new Date(),
+        taskId: taskId
+      });
 
-      console.log(`Starting polling for task ${taskId}. Max attempts: ${maxAttempts}, interval: ${pollingInterval}ms`);
-      console.log(`Maximum wait time: ${(maxAttempts * pollingInterval) / 1000 / 60} minutes`);
+      // Start background polling
+      console.log("🔄 Starting background polling...");
+      pollTaskInBackground(taskId);
 
-      console.log("=== ENTERING POLLING LOOP ===");
-      while (!taskComplete && attempts < maxAttempts) {
-        attempts++;
-        console.log(`--- Polling attempt ${attempts}/${maxAttempts} ---`);
-        
-        // Update progress state
-        const elapsedMinutes = (attempts * pollingInterval) / 1000 / 60;
-        const remainingMinutes = ((maxAttempts - attempts) * pollingInterval) / 1000 / 60;
-        
-        setProcessingProgress({
-          currentAttempt: attempts,
-          maxAttempts: maxAttempts,
-          elapsedMinutes: elapsedMinutes,
-          estimatedRemainingMinutes: remainingMinutes,
-          status: 'polling'
-        });
-        
-        // Log progress every 10 attempts (30 seconds)
-        if (attempts % 10 === 0) {
-          console.log(`Polling attempt ${attempts}/${maxAttempts} (${elapsedMinutes.toFixed(1)} min elapsed, ${remainingMinutes.toFixed(1)} min remaining)`);
-        }
-        
-        console.log(`Waiting ${pollingInterval}ms before next status check...`);
-        await new Promise(resolve => setTimeout(resolve, pollingInterval));
-
-        console.log(`Making status check request for attempt ${attempts}...`);
-        try {
-          // Check task status with timeout
-          const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/`, {
-            timeout: 10000 // 10 seconds timeout for status checks
-          });
-
-          console.log(`Attempt ${attempts}: Task status = ${statusResponse.data.status}`);
-          
-          // Update progress with current status
-          setProcessingProgress(prev => prev ? {
-            ...prev,
-            status: statusResponse.data.status
-          } : null);
-
-          if (statusResponse.data.status === "completed") {
-            console.log("🎉 TASK COMPLETED! Processing final result...");
-            taskComplete = true;
-            console.log(`Task completed after ${attempts} attempts (${(attempts * pollingInterval) / 1000 / 60} minutes)`);
-            
-            // Clear progress state
-            setProcessingProgress(null);
-
-            // Get the URLs for both segmentations
-            const tumorSegUrl = statusResponse.data.tumor_segmentation_url;
-            const lungSegUrl = statusResponse.data.lung_segmentation_url;
-            const originalNiftiUrl = statusResponse.data.nifti_file_url;
-
-            // Debug: Log all received URLs
-            console.log("=== RECEIVED URLs FROM BACKEND ===");
-            console.log("Full API response:", statusResponse.data);
-            console.log("Original NIFTI URL:", originalNiftiUrl);
-            console.log("Tumor segmentation URL:", tumorSegUrl);
-            console.log("Lung segmentation URL:", lungSegUrl);
-            console.log("URL types:", {
-              originalNiftiUrl: typeof originalNiftiUrl,
-              tumorSegUrl: typeof tumorSegUrl,
-              lungSegUrl: typeof lungSegUrl
-            });
-            console.log("URL truthiness:", {
-              originalNiftiUrl: !!originalNiftiUrl,
-              tumorSegUrl: !!tumorSegUrl,
-              lungSegUrl: !!lungSegUrl
-            });
-
-            // Create a result object with the data needed by your viewers
-            const result = {
-              success: true,
-              originalFileUrl: originalNiftiUrl,
-              tumorSegmentationUrl: tumorSegUrl,
-              lungSegmentationUrl: lungSegUrl,
-              resultUrl: tumorSegUrl, // For backward compatibility
-              metrics: {
-                tumorVolume: statusResponse.data.tumor_volume,
-                lungVolume: statusResponse.data.lung_volume,
-                lesionCount: statusResponse.data.lesion_count,
-                confidenceScore: statusResponse.data.confidence_score
-              }
-            };
-            
-            console.log("=== FINAL RESULT OBJECT ===");
-            console.log("Result object:", result);
-            
-            console.log("Setting segmentation result and loading to false...");
-            setSegmentationResult(result);
-            setLoading(false); // Only set loading to false when we have results
-            console.log("✅ AI SEGMENTATION COMPLETED SUCCESSFULLY");
-            return; // Exit the function successfully
-          } else if (statusResponse.data.status === "failed") {
-            console.log("❌ TASK FAILED on the server");
-            setLoading(false); // Set loading to false on failure
-            throw new Error(statusResponse.data.error || "Processing failed");
-          } else if (statusResponse.data.status === "processing") {
-            // Task is still processing, continue polling
-            if (attempts % 20 === 0) { // Log every minute
-              console.log(`Task still processing... (${(attempts * pollingInterval) / 1000 / 60} minutes elapsed)`);
-            }
-            console.log(`Status is 'processing', continuing to poll...`);
-          } else {
-            // Unknown status
-            console.log(`Unknown task status: ${statusResponse.data.status}, continuing to poll...`);
-          }
-        } catch (pollError) {
-          console.error(`❌ Error during polling attempt ${attempts}:`, pollError);
-          // Continue polling despite error, but log it
-          if (attempts % 10 === 0) {
-            console.log("Continuing to poll despite error...");
-          }
-          console.log(`Polling error handled, continuing to next attempt...`);
-          // Don't throw or set any states here - just continue polling
-          // The outer catch block should only catch non-polling errors
-        }
-        
-        console.log(`--- End of polling attempt ${attempts} ---`);
-      }
-
-      console.log("=== EXITED POLLING LOOP ===");
-      // Only reach here if polling timed out
-      if (!taskComplete) {
-        console.log("⏰ POLLING TIMED OUT");
-        const totalMinutes = (maxAttempts * pollingInterval) / 1000 / 60;
-        setProcessingProgress(null); // Clear progress state
-        setLoading(false); // Set loading to false on timeout
-        throw new Error(`Task processing timed out after ${totalMinutes} minutes. The segmentation may still be running on the server.`);
-      }
     } catch (error) {
-      console.error("💥 ERROR IN AI SEGMENTATION FUNCTION:", error);
-      console.error("Error type:", typeof error);
-      console.error("Error constructor:", error?.constructor?.name);
+      console.error("💥 ERROR IN INITIAL FILE UPLOAD:", error);
       
       // Clear progress state on error
       setProcessingProgress(null);
@@ -478,6 +359,157 @@ export function useFileProcessing() {
     console.log("=== AI SEGMENTATION FUNCTION ENDED ===");
   };
 
+  // Separate function for background polling
+  const pollTaskInBackground = async (taskId: string): Promise<void> => {
+    console.log("=== STARTING BACKGROUND POLLING ===");
+    
+    let taskComplete = false;
+    let attempts = 0;
+    const maxAttempts = 600; // 30 minutes total
+    const pollingInterval = 3000; // 3 seconds between polls
+
+    console.log(`Background polling for task ${taskId}. Max attempts: ${maxAttempts}`);
+
+    while (!taskComplete && attempts < maxAttempts) {
+      attempts++;
+      
+      // Update progress state
+      const elapsedMinutes = (attempts * pollingInterval) / 1000 / 60;
+      const remainingMinutes = ((maxAttempts - attempts) * pollingInterval) / 1000 / 60;
+      
+      setProcessingProgress({
+        currentAttempt: attempts,
+        maxAttempts: maxAttempts,
+        elapsedMinutes: elapsedMinutes,
+        estimatedRemainingMinutes: remainingMinutes,
+        status: 'polling'
+      });
+      
+      // Log progress every 20 attempts (1 minute)
+      if (attempts % 20 === 0) {
+        console.log(`Background polling: ${attempts}/${maxAttempts} (${elapsedMinutes.toFixed(1)} min elapsed)`);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, pollingInterval));
+
+      try {
+        // Check task status
+        const statusResponse = await axios.get(`${API_URL}/tasks/${taskId}/`, {
+          timeout: 10000 // 10 seconds timeout for status checks
+        });
+
+        // Update progress with current status
+        setProcessingProgress(prev => prev ? {
+          ...prev,
+          status: statusResponse.data.status
+        } : null);
+
+        if (statusResponse.data.status === "completed") {
+          console.log("🎉 BACKGROUND TASK COMPLETED!");
+          taskComplete = true;
+          
+          // Clear progress state
+          setProcessingProgress(null);
+          setIsProcessingInBackground(false);
+          setBackgroundTaskInfo(null);
+
+          // Get the URLs for both segmentations
+          const tumorSegUrl = statusResponse.data.tumor_segmentation_url;
+          const lungSegUrl = statusResponse.data.lung_segmentation_url;
+          const originalNiftiUrl = statusResponse.data.nifti_file_url;
+
+          // Create result object
+          const result = {
+            success: true,
+            originalFileUrl: originalNiftiUrl,
+            tumorSegmentationUrl: tumorSegUrl,
+            lungSegmentationUrl: lungSegUrl,
+            resultUrl: tumorSegUrl,
+            metrics: {
+              tumorVolume: statusResponse.data.tumor_volume,
+              lungVolume: statusResponse.data.lung_volume,
+              lesionCount: statusResponse.data.lesion_count,
+              confidenceScore: statusResponse.data.confidence_score
+            }
+          };
+          
+          console.log("Background segmentation result:", result);
+          
+          setSegmentationResult(result);
+          setShowCompletionNotification(true); // Show notification
+          
+          console.log("✅ BACKGROUND SEGMENTATION COMPLETED");
+          return;
+        } else if (statusResponse.data.status === "failed") {
+          console.log("❌ BACKGROUND TASK FAILED");
+          taskComplete = true;
+          
+          setProcessingProgress(null);
+          setIsProcessingInBackground(false);
+          setBackgroundTaskInfo(null);
+          
+          setSegmentationResult({
+            success: false,
+            error: statusResponse.data.error || "Processing failed",
+            originalFileUrl: '',
+            tumorSegmentationUrl: '',
+            lungSegmentationUrl: '',
+            resultUrl: '',
+            metrics: {
+              tumorVolume: 0,
+              lungVolume: 0,
+              lesionCount: 0,
+              confidenceScore: 0
+            }
+          });
+          
+          setShowCompletionNotification(true); // Show error notification
+          return;
+        }
+        // Continue polling for other statuses
+      } catch (pollError) {
+        console.error(`Background polling error (attempt ${attempts}):`, pollError);
+        // Continue polling despite errors
+      }
+    }
+
+    // Handle timeout
+    if (!taskComplete) {
+      console.log("⏰ BACKGROUND POLLING TIMED OUT");
+      setProcessingProgress(null);
+      setIsProcessingInBackground(false);
+      setBackgroundTaskInfo(null);
+      
+      setSegmentationResult({
+        success: false,
+        error: "Processing timed out after 30 minutes. The task may still be running on the server.",
+        originalFileUrl: '',
+        tumorSegmentationUrl: '',
+        lungSegmentationUrl: '',
+        resultUrl: '',
+        metrics: {
+          tumorVolume: 0,
+          lungVolume: 0,
+          lesionCount: 0,
+          confidenceScore: 0
+        }
+      });
+      
+      setShowCompletionNotification(true); // Show timeout notification
+    }
+  };
+
+  // Function to handle notification click - navigate to results
+  const handleNotificationClick = () => {
+    setShowCompletionNotification(false);
+    // The segmentationResult is already set, so the UI will automatically show the results
+  };
+
+  // Function to dismiss notification without viewing
+  const dismissNotification = () => {
+    setShowCompletionNotification(false);
+  };
+
   const completeManualSegmentation = (segData: any) => {
     setManualSegmentationData(segData.segmentationMask);
     // Store the screenshot if available
@@ -514,6 +546,14 @@ export function useFileProcessing() {
     showManualSegmentationPreview,
     setShowManualSegmentationPreview,
     isMockData,
-    processingProgress
+    processingProgress,
+    isProcessingInBackground,
+    setIsProcessingInBackground,
+    backgroundTaskInfo,
+    setBackgroundTaskInfo,
+    showCompletionNotification,
+    setShowCompletionNotification,
+    handleNotificationClick,
+    dismissNotification
   };
 }

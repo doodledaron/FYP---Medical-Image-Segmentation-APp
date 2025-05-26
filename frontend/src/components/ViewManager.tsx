@@ -177,6 +177,11 @@ export function ViewManager({ currentView, setCurrentView }: ViewManagerProps) {
             completeManualSegmentation={fileProcessing.completeManualSegmentation}
             isMockData={fileProcessing.isMockData}
             processingProgress={fileProcessing.processingProgress}
+            isProcessingInBackground={fileProcessing.isProcessingInBackground}
+            backgroundTaskInfo={fileProcessing.backgroundTaskInfo}
+            showCompletionNotification={fileProcessing.showCompletionNotification}
+            handleNotificationClick={fileProcessing.handleNotificationClick}
+            dismissNotification={fileProcessing.dismissNotification}
           />
         )}
       </main>
