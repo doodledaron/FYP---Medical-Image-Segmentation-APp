@@ -36,9 +36,12 @@ class SegmentationTaskDetailSerializer(serializers.ModelSerializer):
     
     def get_tumor_segmentation_url(self, obj):
         print(f"=== TUMOR SEGMENTATION URL DEBUG for Task {obj.id} ===")
-        print(f"Task {obj.id} - Serializing tumor_segmentation: name='{obj.tumor_segmentation.name if obj.tumor_segmentation else None}', field_exists={bool(obj.tumor_segmentation)}")
+        print(f"Task {obj.id} - tumor_segmentation field type: {type(obj.tumor_segmentation)}")
+        print(f"Task {obj.id} - tumor_segmentation.name: '{obj.tumor_segmentation.name if obj.tumor_segmentation else None}'")
+        print(f"Task {obj.id} - tumor_segmentation bool: {bool(obj.tumor_segmentation)}")
+        print(f"Task {obj.id} - tumor_segmentation.name bool: {bool(obj.tumor_segmentation.name) if obj.tumor_segmentation else False}")
         
-        if obj.tumor_segmentation:
+        if obj.tumor_segmentation and obj.tumor_segmentation.name:
             try:
                 request = self.context.get('request')
                 print(f"Task {obj.id} - Request context available: {bool(request)}")
@@ -55,16 +58,21 @@ class SegmentationTaskDetailSerializer(serializers.ModelSerializer):
                     return url
             except Exception as e:
                 print(f"Task {obj.id} - Error generating tumor segmentation URL: {str(e)}")
+                import traceback
+                print(f"Traceback: {traceback.format_exc()}")
                 return None
         else:
-            print(f"Task {obj.id} - tumor_segmentation field is empty or None")
+            print(f"Task {obj.id} - tumor_segmentation field is empty or name is empty")
             return None
     
     def get_lung_segmentation_url(self, obj):
         print(f"=== LUNG SEGMENTATION URL DEBUG for Task {obj.id} ===")
-        print(f"Task {obj.id} - Serializing lung_segmentation: name='{obj.lung_segmentation.name if obj.lung_segmentation else None}', field_exists={bool(obj.lung_segmentation)}")
+        print(f"Task {obj.id} - lung_segmentation field type: {type(obj.lung_segmentation)}")
+        print(f"Task {obj.id} - lung_segmentation.name: '{obj.lung_segmentation.name if obj.lung_segmentation else None}'")
+        print(f"Task {obj.id} - lung_segmentation bool: {bool(obj.lung_segmentation)}")
+        print(f"Task {obj.id} - lung_segmentation.name bool: {bool(obj.lung_segmentation.name) if obj.lung_segmentation else False}")
         
-        if obj.lung_segmentation:
+        if obj.lung_segmentation and obj.lung_segmentation.name:
             try:
                 request = self.context.get('request')
                 print(f"Task {obj.id} - Request context available: {bool(request)}")
@@ -81,16 +89,21 @@ class SegmentationTaskDetailSerializer(serializers.ModelSerializer):
                     return url
             except Exception as e:
                 print(f"Task {obj.id} - Error generating lung segmentation URL: {str(e)}")
+                import traceback
+                print(f"Traceback: {traceback.format_exc()}")
                 return None
         else:
-            print(f"Task {obj.id} - lung_segmentation field is empty or None")
+            print(f"Task {obj.id} - lung_segmentation field is empty or name is empty")
             return None
     
     def get_nifti_file_url(self, obj):
         print(f"=== NIFTI FILE URL DEBUG for Task {obj.id} ===")
-        print(f"Task {obj.id} - Serializing nifti_file: name='{obj.nifti_file.name if obj.nifti_file else None}', field_exists={bool(obj.nifti_file)}")
+        print(f"Task {obj.id} - nifti_file field type: {type(obj.nifti_file)}")
+        print(f"Task {obj.id} - nifti_file.name: '{obj.nifti_file.name if obj.nifti_file else None}'")
+        print(f"Task {obj.id} - nifti_file bool: {bool(obj.nifti_file)}")
+        print(f"Task {obj.id} - nifti_file.name bool: {bool(obj.nifti_file.name) if obj.nifti_file else False}")
         
-        if obj.nifti_file:
+        if obj.nifti_file and obj.nifti_file.name:
             try:
                 request = self.context.get('request')
                 print(f"Task {obj.id} - Request context available: {bool(request)}")
@@ -107,7 +120,9 @@ class SegmentationTaskDetailSerializer(serializers.ModelSerializer):
                     return url
             except Exception as e:
                 print(f"Task {obj.id} - Error generating nifti file URL: {str(e)}")
+                import traceback
+                print(f"Traceback: {traceback.format_exc()}")
                 return None
         else:
-            print(f"Task {obj.id} - nifti_file field is empty or None")
+            print(f"Task {obj.id} - nifti_file field is empty or name is empty")
             return None

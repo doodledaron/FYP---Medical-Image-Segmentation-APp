@@ -139,10 +139,28 @@ def process_segmentation_task(task_id):
         
         # Update the task with the file paths
         print(f"Updating task with new file paths...")
-        task.tumor_segmentation.name = media_relative_paths['tumor_segmentation']
-        task.lung_segmentation.name = media_relative_paths['lung_segmentation']
+        
+        # Calculate relative paths from MEDIA_ROOT
+        tumor_relative_path = os.path.relpath(result_files['tumor_segmentation'], settings.MEDIA_ROOT)
+        lung_relative_path = os.path.relpath(result_files['lung_segmentation'], settings.MEDIA_ROOT)
+        
+        print(f"Tumor relative path: {tumor_relative_path}")
+        print(f"Lung relative path: {lung_relative_path}")
+        
+        # Directly assign the relative paths to the FileField name attributes
+        # This tells Django where the files are located relative to MEDIA_ROOT
+        task.tumor_segmentation.name = tumor_relative_path
+        task.lung_segmentation.name = lung_relative_path
+        
+        # Save the task with updated file references
         task.save(update_fields=['tumor_segmentation', 'lung_segmentation', 'updated_at'])
         print(f"✓ Task updated with new file paths")
+        
+        # Verify the FileField names are set correctly
+        print(f"Final tumor_segmentation.name: '{task.tumor_segmentation.name}'")
+        print(f"Final lung_segmentation.name: '{task.lung_segmentation.name}'")
+        print(f"Tumor segmentation file exists: {os.path.exists(task.tumor_segmentation.path)}")
+        print(f"Lung segmentation file exists: {os.path.exists(task.lung_segmentation.path)}")
         
         print(f"=== VERIFYING SAVED FILES ===")
         # Verify the saved files can be loaded with nibabel
