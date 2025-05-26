@@ -97,6 +97,13 @@ export function useFileProcessing() {
   const [manualSegmentationScreenshot, setManualSegmentationScreenshot] = useState<string | null>(null);
   const [showManualSegmentationPreview, setShowManualSegmentationPreview] = useState<boolean>(false);
   const [isMockData, setIsMockData] = useState<boolean>(false);
+  const [processingProgress, setProcessingProgress] = useState<{
+    currentAttempt: number;
+    maxAttempts: number;
+    elapsedMinutes: number;
+    estimatedRemainingMinutes: number;
+    status: string;
+  } | null>(null);
   
   // Also try to load the mock file on component mount
   useEffect(() => {
@@ -238,11 +245,32 @@ export function useFileProcessing() {
       // Poll for task completion with longer timeout
       let taskComplete = false;
       let attempts = 0;
-      const maxAttempts = 120;
-      const pollingInterval = 3000;
+      const maxAttempts = 600; // Increased from 120 to 600 (30 minutes total)
+      const pollingInterval = 3000; // 3 seconds between polls
+
+      console.log(`Starting polling for task ${taskId}. Max attempts: ${maxAttempts}, interval: ${pollingInterval}ms`);
+      console.log(`Maximum wait time: ${(maxAttempts * pollingInterval) / 1000 / 60} minutes`);
 
       while (!taskComplete && attempts < maxAttempts) {
         attempts++;
+        
+        // Update progress state
+        const elapsedMinutes = (attempts * pollingInterval) / 1000 / 60;
+        const remainingMinutes = ((maxAttempts - attempts) * pollingInterval) / 1000 / 60;
+        
+        setProcessingProgress({
+          currentAttempt: attempts,
+          maxAttempts: maxAttempts,
+          elapsedMinutes: elapsedMinutes,
+          estimatedRemainingMinutes: remainingMinutes,
+          status: 'polling'
+        });
+        
+        // Log progress every 10 attempts (30 seconds)
+        if (attempts % 10 === 0) {
+          console.log(`Polling attempt ${attempts}/${maxAttempts} (${elapsedMinutes.toFixed(1)} min elapsed, ${remainingMinutes.toFixed(1)} min remaining)`);
+        }
+        
         await new Promise(resolve => setTimeout(resolve, pollingInterval));
 
         try {
@@ -251,8 +279,20 @@ export function useFileProcessing() {
             timeout: 10000 // 10 seconds timeout for status checks
           });
 
+          console.log(`Attempt ${attempts}: Task status = ${statusResponse.data.status}`);
+          
+          // Update progress with current status
+          setProcessingProgress(prev => prev ? {
+            ...prev,
+            status: statusResponse.data.status
+          } : null);
+
           if (statusResponse.data.status === "completed") {
             taskComplete = true;
+            console.log(`Task completed after ${attempts} attempts (${(attempts * pollingInterval) / 1000 / 60} minutes)`);
+            
+            // Clear progress state
+            setProcessingProgress(null);
 
             // Get the URLs for both segmentations
             const tumorSegUrl = statusResponse.data.tumor_segmentation_url;
@@ -297,18 +337,34 @@ export function useFileProcessing() {
             setSegmentationResult(result);
           } else if (statusResponse.data.status === "failed") {
             throw new Error(statusResponse.data.error || "Processing failed");
+          } else if (statusResponse.data.status === "processing") {
+            // Task is still processing, continue polling
+            if (attempts % 20 === 0) { // Log every minute
+              console.log(`Task still processing... (${(attempts * pollingInterval) / 1000 / 60} minutes elapsed)`);
+            }
+          } else {
+            // Unknown status
+            console.log(`Unknown task status: ${statusResponse.data.status}`);
           }
         } catch (pollError) {
-          console.error("Error during polling:", pollError);
-          // Continue polling despite error
+          console.error(`Error during polling attempt ${attempts}:`, pollError);
+          // Continue polling despite error, but log it
+          if (attempts % 10 === 0) {
+            console.log("Continuing to poll despite error...");
+          }
         }
       }
 
       if (!taskComplete) {
-        throw new Error("Task processing timed out");
+        const totalMinutes = (maxAttempts * pollingInterval) / 1000 / 60;
+        setProcessingProgress(null); // Clear progress state
+        throw new Error(`Task processing timed out after ${totalMinutes} minutes. The segmentation may still be running on the server.`);
       }
     } catch (error) {
       console.error("Error processing file:", error);
+      
+      // Clear progress state on error
+      setProcessingProgress(null);
       
       // More detailed error reporting
       let errorMessage = "Failed to process file";
@@ -379,6 +435,7 @@ export function useFileProcessing() {
     manualSegmentationScreenshot,
     showManualSegmentationPreview,
     setShowManualSegmentationPreview,
-    isMockData
+    isMockData,
+    processingProgress
   };
 }
