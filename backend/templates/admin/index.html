@@ -5,231 +5,349 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">
   <style>
-    .dashboard-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-    .dashboard-card {
-      background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      padding: 20px;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .dashboard-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    }
-    .dashboard-card-title {
-      font-size: 16px;
-      font-weight: 500;
-      color: #666;
-      margin-bottom: 10px;
-    }
-    .dashboard-card-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: #1a73e8;
-    }
-    .dashboard-card-subtitle {
-      font-size: 14px;
-      color: #888;
-      margin-top: 10px;
-    }
-    .dashboard-chart {
-      background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-    .dashboard-chart-title {
-      font-size: 18px;
-      font-weight: 500;
-      color: #333;
-      margin-bottom: 15px;
-    }
-    .dashboard-table {
-      background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-    .dashboard-table-title {
-      font-size: 18px;
-      font-weight: 500;
-      color: #333;
-      margin-bottom: 15px;
-    }
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .data-table th {
-      text-align: left;
-      padding: 8px;
-      border-bottom: 2px solid #eee;
-      font-weight: 500;
-      color: #666;
-    }
-    .data-table td {
-      padding: 8px;
-      border-bottom: 1px solid #eee;
-    }
-    .status-badge {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 500;
-    }
-    .status-queued {
-      background-color: #f3f4f6;
-      color: #374151;
-    }
-    .status-processing {
-      background-color: #dbeafe;
-      color: #1e40af;
-    }
-    .status-completed {
-      background-color: #d1fae5;
-      color: #065f46;
-    }
-    .status-failed {
-      background-color: #fee2e2;
-      color: #b91c1c;
-    }
-    .header-title {
-      font-size: 24px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 5px;
-    }
-    .header-subtitle {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 20px;
+    /* Import professional font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* Global typography */
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      letter-spacing: -0.01em;
     }
     
-    /* New styles for segmentation previews */
-    .preview-image {
-      max-width: 80px;
-      max-height: 80px;
-      border-radius: 4px;
-      border: 1px solid #eee;
+    /* Loading indicator styles */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(249, 250, 251, 0.95), rgba(243, 244, 246, 0.95));
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      flex-direction: column;
     }
-    .metrics-pill {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 10px;
-      font-size: 11px;
-      margin-right: 4px;
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(99, 102, 241, 0.1);
+      border-top: 3px solid #6366f1;
+      border-radius: 50%;
+      animation: spin 1s ease-in-out infinite;
     }
-    .lesion-pill {
-      background-color: #fee2e2;
-      color: #b91c1c;
+    .loading-text {
+      margin-top: 16px;
+      font-size: 14px;
+      color: #6b7280;
+      font-weight: 500;
+      letter-spacing: 0.025em;
     }
-    .count-pill {
-      background-color: #e0e7ff;
-      color: #4338ca;
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
-    .confidence-pill {
-      background-color: #d1fae5;
-      color: #065f46;
+    
+    /* Dashboard content animations */
+    .dashboard-content {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .detail-link {
-      display: inline-block;
-      padding: 3px 8px;
-      background-color: #e0f2fe;
-      color: #0369a1;
-      border-radius: 4px;
-      text-decoration: none;
+    .dashboard-content.loaded {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+         /* Header styling - Clear and visible */
+     .header-title {
+       font-size: 28px;
+       font-weight: 600;
+       color: white;
+       margin-bottom: 8px;
+       line-height: 1.3;
+     }
+     .header-subtitle {
+       font-size: 15px;
+       color: #4b5563;
+       margin-bottom: 32px;
+       font-weight: 400;
+       line-height: 1.4;
+     }
+    
+         /* Manage Data section - Simple and clean */
+     .manage-data-section {
+       background: #f9fafb;
+       border: 1px solid #e5e7eb;
+       border-radius: 8px;
+       padding: 20px;
+       margin-bottom: 24px;
+     }
+     .manage-data-title {
+       font-size: 16px;
+       font-weight: 600;
+       color: #374151;
+       margin: 0 0 12px 0;
+       display: flex;
+       align-items: center;
+       gap: 6px;
+     }
+     .manage-data-buttons {
+       display: flex;
+       gap: 8px;
+       flex-wrap: wrap;
+     }
+     .manage-btn {
+       padding: 10px 16px;
+       border-radius: 6px;
+       text-decoration: none;
+       font-weight: 500;
+       font-size: 13px;
+       transition: all 0.2s ease;
+       display: flex;
+       align-items: center;
+       gap: 6px;
+     }
+     .manage-btn:hover {
+       transform: translateY(-1px);
+       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+       text-decoration: none;
+     }
+     .manage-btn.users {
+       background: #6366f1;
+       color: white;
+     }
+     .manage-btn.learning {
+       background: #059669;
+       color: white;
+     }
+     .manage-btn.segmentation {
+       background: #2563eb;
+       color: white;
+     }
+    
+         /* Dashboard cards - Simple and clean */
+     .dashboard-container {
+       display: grid;
+       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+       gap: 16px;
+       margin-bottom: 24px;
+     }
+     .dashboard-card {
+       background: white;
+       border: 1px solid #e5e7eb;
+       border-radius: 8px;
+       padding: 20px;
+       transition: all 0.2s ease;
+     }
+     .dashboard-card:hover {
+       transform: translateY(-2px);
+       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+     }
+     .dashboard-card-title {
+       font-size: 13px;
+       font-weight: 500;
+       color: #6b7280;
+       margin-bottom: 8px;
+       text-transform: uppercase;
+       letter-spacing: 0.025em;
+     }
+     .dashboard-card-value {
+       font-size: 32px;
+       font-weight: 700;
+       color: #1f2937;
+       line-height: 1.1;
+       margin-bottom: 4px;
+     }
+     .dashboard-card-subtitle {
+       font-size: 12px;
+       color: #9ca3af;
+       font-weight: 400;
+       line-height: 1.3;
+     }
+    
+         /* Table styling - Simple and clean */
+     .dashboard-table {
+       background: white;
+       border: 1px solid #e5e7eb;
+       border-radius: 8px;
+       padding: 0;
+       margin-bottom: 24px;
+       overflow: hidden;
+     }
+     .dashboard-table-title {
+       font-size: 16px;
+       font-weight: 600;
+       color: #374151;
+       margin: 0;
+       padding: 20px 20px 0 20px;
+       margin-bottom: 16px;
+     }
+     .data-table {
+       width: 100%;
+       border-collapse: collapse;
+       margin: 0;
+     }
+     .data-table th {
+       text-align: left;
+       padding: 12px 20px;
+       border-bottom: 1px solid #e5e7eb;
+       font-weight: 600;
+       color: #374151;
+       font-size: 12px;
+       text-transform: uppercase;
+       letter-spacing: 0.025em;
+       background: #f9fafb;
+     }
+     .data-table td {
+       padding: 12px 20px;
+       border-bottom: 1px solid #f3f4f6;
+       font-size: 14px;
+       color: #374151;
+       line-height: 1.4;
+     }
+     .data-table tr:last-child td {
+       border-bottom: none;
+     }
+     .data-table tr:hover {
+       background: #f9fafb;
+     }
+    
+    /* Status badges - Subtle and refined */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 20px;
       font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.025em;
     }
-    .detail-link:hover {
-      background-color: #bae6fd;
+    .status-queued {
+      background: rgba(156, 163, 175, 0.1);
+      color: #6b7280;
+      border: 1px solid rgba(156, 163, 175, 0.2);
     }
-    .chart-container {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 20px;
-      margin-bottom: 20px;
+    .status-processing {
+      background: rgba(59, 130, 246, 0.1);
+      color: #3b82f6;
+      border: 1px solid rgba(59, 130, 246, 0.2);
     }
+    .status-completed {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .status-failed {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    
+    /* Responsive design */
     @media (max-width: 768px) {
-      .chart-container {
+      .header-title {
+        font-size: 28px;
+      }
+      .dashboard-container {
         grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      .manage-data-buttons {
+        flex-direction: column;
+      }
+      .manage-btn {
+        justify-content: center;
       }
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
 
 {% block breadcrumbs %}{% endblock %}
 
 {% block content %}
-<div class="header-title">MedLearn AI Dashboard</div>
-<div class="header-subtitle">Overview of platform activity - Updated: {% now "F j, Y, g:i a" %}</div>
+<!-- Loading Indicator -->
+<div id="loadingOverlay" class="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Loading Dashboard...</div>
+</div>
 
-<!-- Statistics Cards -->
+<!-- Dashboard Content -->
+<div id="dashboardContent" class="dashboard-content">
+  <div class="header-title">MedLearn AI Dashboard</div>
+  <div class="header-subtitle">Segmentation Overview - Updated: {% now "F j, Y, g:i a" %}</div>
+
+<!-- Manage Data -->
+<div class="manage-data-section">
+  <h3 class="manage-data-title">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7v10c0 5.55 3.84 10 9 11 1.16.21 2.76.21 3.97 0 5.16-1 9-5.45 9-11V7l-10-5z"/>
+    </svg>
+    Manage Data
+  </h3>
+  <div class="manage-data-buttons">
+    <a href="/admin/auth/user/" class="manage-btn users">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      Users
+    </a>
+    <a href="/admin/learning/" class="manage-btn learning">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+      </svg>
+      Learning
+    </a>
+    <a href="/admin/segmentation/" class="manage-btn segmentation">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+      </svg>
+      Segmentation
+    </a>
+  </div>
+</div>
+
+<!-- Basic Statistics Cards -->
 <div class="dashboard-container">
   <div class="dashboard-card">
-    <div class="dashboard-card-title">Segmentation Tasks</div>
-    <div class="dashboard-card-value">{{ task_count|default:"0" }}</div>
-    <div class="dashboard-card-subtitle">{{ recent_tasks_count|default:"0" }} in last week</div>
+    <div class="dashboard-card-title">Total Segmentations</div>
+    <div class="dashboard-card-value">{{ total_segmentations|default:"0" }}</div>
+    <div class="dashboard-card-subtitle">All time</div>
   </div>
   
   <div class="dashboard-card">
-    <div class="dashboard-card-title">Completed Tasks</div>
-    <div class="dashboard-card-value">{{ completed_tasks|default:"0" }}</div>
-    <div class="dashboard-card-subtitle">{{ success_rate|default:"0" }}% success rate</div>
+    <div class="dashboard-card-title">Completed Segmentations</div>
+    <div class="dashboard-card-value">{{ completed_segmentations|default:"0" }}</div>
+    <div class="dashboard-card-subtitle">Successfully processed</div>
   </div>
   
   <div class="dashboard-card">
-    <div class="dashboard-card-title">Avg. Tumor Volume</div>
-    <div class="dashboard-card-value">{{ avg_tumor_volume|default:"0" }} cc</div>
-    <div class="dashboard-card-subtitle">From {{ completed_tasks|default:"0" }} completed tasks</div>
-  </div>
-  
-  <div class="dashboard-card">
-    <div class="dashboard-card-title">Avg. Lung Volume</div>
-    <div class="dashboard-card-value">{{ avg_lung_volume|default:"0" }} cc</div>
-    <div class="dashboard-card-subtitle">Total lung volume per scan</div>
+    <div class="dashboard-card-title">Completion Rate</div>
+    <div class="dashboard-card-value">{{ completion_rate|default:"0" }}%</div>
+    <div class="dashboard-card-subtitle">Success rate</div>
   </div>
 </div>
 
-<!-- Charts -->
-<div class="chart-container">
-  <div class="dashboard-chart">
-    <div class="dashboard-chart-title">Segmentation Tasks (Last 30 days)</div>
-    <canvas id="taskLineChart" height="200"></canvas>
-  </div>
-  
-  <div class="dashboard-chart">
-    <div class="dashboard-chart-title">Status Breakdown</div>
-    <canvas id="statusChart" height="200"></canvas>
-  </div>
-</div>
-
-<!-- Tables -->
+<!-- Segmentation History Table -->
 <div class="dashboard-table">
-  <div class="dashboard-table-title">Latest Segmentation Tasks</div>
+  <div class="dashboard-table-title">Segmentation History</div>
   <table class="data-table">
     <thead>
       <tr>
-        <th>File</th>
+        <th>File Name</th>
         <th>Status</th>
-        <th>Date</th>
-        <th>Metrics</th>
-        <th>Tumor Preview</th>
-        <th>Lung Preview</th>
-        <th>Actions</th>
+        <th>Created Date</th>
+        <th>Updated Date</th>
       </tr>
     </thead>
     <tbody>
-      {% for task in latest_tasks %}
+      {% for task in segmentation_tasks %}
       <tr>
         <td>{{ task.file_name }}</td>
         <td>
@@ -237,126 +355,38 @@
             {{ task.status|title }}
           </span>
         </td>
-        <td>{{ task.created_at|date:"M d, Y" }}</td>
-        <td>
-          {% if task.tumor_volume is not None %}
-            <span class="metrics-pill lesion-pill">{{ task.tumor_volume|floatformat:1 }} cc tumor</span>
-          {% endif %}
-          
-          {% if task.lung_volume is not None %}
-            <span class="metrics-pill count-pill">{{ task.lung_volume|floatformat:1 }} cc lung</span>
-          {% endif %}
-          
-          {% if task.lesion_count is not None %}
-            <span class="metrics-pill count-pill">{{ task.lesion_count }} lesion{{ task.lesion_count|pluralize }}</span>
-          {% endif %}
-          
-          {% if task.confidence_score is not None %}
-            <span class="metrics-pill confidence-pill">{{ task.confidence_score|floatformat:0 }}% conf</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if task.tumor_preview %}
-            <img src="data:image/png;base64,{{ task.tumor_preview }}" alt="Tumor Preview" class="preview-image">
-          {% else %}
-            <span class="text-gray-400">No preview</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if task.lung_preview %}
-            <img src="data:image/png;base64,{{ task.lung_preview }}" alt="Lung Preview" class="preview-image">
-          {% else %}
-            <span class="text-gray-400">No preview</span>
-          {% endif %}
-        </td>
-        <td>
-          <a href="{% url 'admin:segmentation_segmentationtask_change' task.id %}" class="detail-link">
-            View Details
-          </a>
-        </td>
+        <td>{{ task.created_at|date:"M d, Y g:i a" }}</td>
+        <td>{{ task.updated_at|date:"M d, Y g:i a" }}</td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="7" style="text-align: center; padding: 20px;">No tasks found</td>
+        <td colspan="4" style="text-align: center; padding: 20px;">No segmentation tasks found</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 
+</div> <!-- End dashboard-content -->
+
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // Task Line Chart
-    const taskCtx = document.getElementById('taskLineChart').getContext('2d');
-    const timeLabels = {{ time_labels|default:"[]"|safe }};
-    const timeData = {{ time_data|default:"[]"|safe }};
-    
-    new Chart(taskCtx, {
-      type: 'line',
-      data: {
-        labels: timeLabels,
-        datasets: [{
-          label: 'Tasks',
-          data: timeData,
-          borderColor: 'rgba(79, 70, 229, 1)',
-          backgroundColor: 'rgba(79, 70, 229, 0.1)',
-          fill: true
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            display: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              precision: 0
-            }
-          }
-        }
-      }
-    });
-    
-    // Status Breakdown Chart
-    const statusCtx = document.getElementById('statusChart').getContext('2d');
-    const statusLabels = {{ status_labels|default:"[]"|safe }};
-    const statusData = {{ status_data|default:"[]"|safe }};
-    
-    // Generate colors based on status
-    const statusColors = statusLabels.map(label => {
-      switch(label.toLowerCase()) {
-        case 'completed': return 'rgba(16, 185, 129, 0.7)';
-        case 'failed': return 'rgba(239, 68, 68, 0.7)';
-        case 'processing': return 'rgba(59, 130, 246, 0.7)';
-        case 'queued': return 'rgba(156, 163, 175, 0.7)';
-        default: return 'rgba(107, 114, 128, 0.7)';
-      }
-    });
-    
-    new Chart(statusCtx, {
-      type: 'doughnut',
-      data: {
-        labels: statusLabels,
-        datasets: [{
-          data: statusData,
-          backgroundColor: statusColors,
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'right'
-          }
-        }
-      }
-    });
+document.addEventListener('DOMContentLoaded', function() {
+  // Hide loading overlay and show content with fade-in effect
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const dashboardContent = document.getElementById('dashboardContent');
+  
+  // Small delay to ensure everything is loaded
+  setTimeout(function() {
+    loadingOverlay.style.display = 'none';
+    dashboardContent.classList.add('loaded');
+  }, 300);
+  
+  // Add faster loading for subsequent page navigations
+  window.addEventListener('beforeunload', function() {
+    loadingOverlay.style.display = 'flex';
+    dashboardContent.classList.remove('loaded');
   });
+});
 </script>
 
 {% endblock %}

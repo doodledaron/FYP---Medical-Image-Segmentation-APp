@@ -10,7 +10,7 @@ import nibabel as nib
 import shutil
 import logging
 
-# Get logger
+# tasks.py
 logger = logging.getLogger(__name__)
 
 @shared_task

@@ -21,9 +21,9 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    # Admin panel
+    # Admin panel with custom dashboard
     path('admin/', admin.site.urls),
-    # Custom admin dashboard
+    # Custom admin dashboard (also available as direct URL)
     path('admin/dashboard/', admin_dashboard, name='admin-dashboard'),
     
     # API endpoints

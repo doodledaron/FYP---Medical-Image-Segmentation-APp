@@ -93,101 +93,75 @@ def generate_segmentation_preview(segmentation_path):
 @staff_member_required
 def admin_dashboard(request):
     """
-    Custom admin dashboard with segmentation tasks and metrics
+    Optimized admin dashboard with segmentation tasks and metrics
     """
+    start_time = timezone.now()
+    
     # Date ranges
     today = timezone.now().date()
     last_7_days = today - timedelta(days=7)
     last_30_days = today - timedelta(days=30)
     
-    # Segmentation stats
-    task_count = SegmentationTask.objects.count()
-    recent_tasks_count = SegmentationTask.objects.filter(created_at__date__gte=last_7_days).count()
-    completed_tasks = SegmentationTask.objects.filter(status='completed').count()
-    failed_tasks = SegmentationTask.objects.filter(status='failed').count()
+    # OPTIMIZATION 1: Use single aggregation query for all counts
+    from django.db.models import Q
+    stats = SegmentationTask.objects.aggregate(
+        total_count=Count('id'),
+        recent_count=Count('id', filter=Q(created_at__date__gte=last_7_days)),
+        completed_count=Count('id', filter=Q(status='completed')),
+        failed_count=Count('id', filter=Q(status='failed')),
+        avg_tumor_volume=Avg('tumor_volume', filter=Q(status='completed', tumor_volume__isnull=False)),
+        avg_lung_volume=Avg('lung_volume', filter=Q(status='completed', lung_volume__isnull=False)),
+        avg_lesion_count=Avg('lesion_count', filter=Q(status='completed', lesion_count__isnull=False))
+    )
+    
+    task_count = stats['total_count'] or 0
+    recent_tasks_count = stats['recent_count'] or 0
+    completed_tasks = stats['completed_count'] or 0
+    failed_tasks = stats['failed_count'] or 0
+    avg_tumor_volume = stats['avg_tumor_volume'] or 0
+    avg_lung_volume = stats['avg_lung_volume'] or 0
+    avg_lesion_count = stats['avg_lesion_count'] or 0
     
     # Calculate success rate
     processing_total = completed_tasks + failed_tasks
     success_rate = (completed_tasks / processing_total * 100) if processing_total > 0 else 0
     
-    # Get average statistics
-    avg_tumor_volume = SegmentationTask.objects.filter(
-        status='completed', 
-        tumor_volume__isnull=False
-    ).aggregate(Avg('tumor_volume'))['tumor_volume__avg'] or 0
-    
-    avg_lung_volume = SegmentationTask.objects.filter(
-        status='completed',
-        lung_volume__isnull=False
-    ).aggregate(Avg('lung_volume'))['lung_volume__avg'] or 0
-    
-    avg_lesion_count = SegmentationTask.objects.filter(
-        status='completed',
-        lesion_count__isnull=False
-    ).aggregate(Avg('lesion_count'))['lesion_count__avg'] or 0
-    
-    # Tasks over time
+    # OPTIMIZATION 2: Simplified time series data (last 7 days only for faster loading)
     tasks_over_time = list(SegmentationTask.objects
-                         .filter(created_at__date__gte=last_30_days)
+                         .filter(created_at__date__gte=last_7_days)
                          .annotate(day=TruncDay('created_at'))
                          .values('day')
                          .annotate(count=Count('id'))
                          .order_by('day'))
     
-    # Status breakdown
+    # Status breakdown (unchanged - already efficient)
     status_counts = SegmentationTask.objects.values('status').annotate(count=Count('id')).order_by('status')
     status_labels = [item['status'].title() for item in status_counts]
     status_data = [item['count'] for item in status_counts]
     
-    # Generate date-based labels even if there's no data
+    # Generate simplified date labels (last 7 days only)
     date_labels = []
     date_counts = []
-    
-    # Generate all dates for the last 30 days
-    for i in range(30, 0, -1):
+    for i in range(7, 0, -1):
         current_date = today - timedelta(days=i)
         date_labels.append(current_date.strftime('%b %d'))
-        
-        # Find matching count or use 0
         matching_day = next((item for item in tasks_over_time if item['day'].date() == current_date), None)
         date_counts.append(matching_day['count'] if matching_day else 0)
     
-    # Latest segmentation tasks
-    latest_tasks = list(SegmentationTask.objects
-                       .order_by('-created_at')[:10]
-                       .values('id', 'file_name', 'status', 'created_at', 
-                              'tumor_volume', 'lung_volume', 'lesion_count', 'confidence_score'))
+    # OPTIMIZATION 3: Limit segmentation tasks for history table and remove preview generation
+    segmentation_tasks = SegmentationTask.objects.select_related('user').order_by('-created_at')[:20]
     
-    # Add preview images to latest tasks
-    for task in latest_tasks:
-        try:
-            # Get the task object to access the file paths
-            task_obj = SegmentationTask.objects.get(id=task['id'])
-            
-            # Generate preview for tumor segmentation
-            if task_obj.tumor_segmentation and hasattr(task_obj.tumor_segmentation, 'path'):
-                print(f"Generating tumor preview for {task_obj.file_name}")
-                task['tumor_preview'] = generate_segmentation_preview(task_obj.tumor_segmentation.path)
-            else:
-                task['tumor_preview'] = None
-                
-            # Generate preview for lung segmentation
-            if task_obj.lung_segmentation and hasattr(task_obj.lung_segmentation, 'path'):
-                print(f"Generating lung preview for {task_obj.file_name}")
-                task['lung_preview'] = generate_segmentation_preview(task_obj.lung_segmentation.path)
-            else:
-                task['lung_preview'] = None
-            
-            # Format confidence score as percentage
-            if task['confidence_score'] is not None:
-                task['confidence_score'] = task['confidence_score'] * 100
-        except Exception as e:
-            print(f"Error processing task {task['id']}: {str(e)}")
-            print(traceback.format_exc())
-            task['tumor_preview'] = None
-            task['lung_preview'] = None
+    # OPTIMIZATION 4: Remove slow preview generation for faster loading
+    # Preview generation is moved to a separate view/endpoint if needed
     
     context = {
+        # Simple dashboard data as requested
+        'total_segmentations': task_count,
+        'completed_segmentations': completed_tasks,
+        'completion_rate': round(success_rate, 1),
+        'segmentation_tasks': segmentation_tasks,
+        
+        # Keep existing context for backward compatibility
         'task_count': task_count,
         'recent_tasks_count': recent_tasks_count,
         'completed_tasks': completed_tasks,
@@ -200,13 +174,18 @@ def admin_dashboard(request):
         'time_data': json.dumps(date_counts),
         'status_labels': json.dumps(status_labels),
         'status_data': json.dumps(status_data),
-        'latest_tasks': latest_tasks,
+        'latest_tasks': [],  # Removed slow preview generation
     }
     
+    # Performance logging
+    end_time = timezone.now()
+    duration = (end_time - start_time).total_seconds()
+    print(f"=== DASHBOARD PERFORMANCE ===")
+    print(f"Load time: {duration:.3f} seconds")
     print(f"Dashboard data: {task_count} tasks, {completed_tasks} completed, {failed_tasks} failed")
-    print(f"Chart data: {len(date_labels)} data points")
-    if latest_tasks:
-        print(f"First task previews: Tumor={latest_tasks[0].get('tumor_preview') is not None}, Lung={latest_tasks[0].get('lung_preview') is not None}")
+    print(f"Success rate: {success_rate:.1f}%")
+    print(f"History table: {len(segmentation_tasks)} recent tasks")
+    print(f"=== END PERFORMANCE ===")
     
     return render(request, 'admin/index.html', context)
 
@@ -223,5 +202,15 @@ class SegmentationTaskAdmin(admin.ModelAdmin):
 
 admin.site.register(SegmentationTask, SegmentationTaskAdmin)
 
-# Override the admin index
-admin.site.index_template = 'admin/index.html'
+# Configure the default admin site
+admin.site.site_header = 'MedLearn AI Administration'
+admin.site.site_title = 'MedLearn AI Admin'
+admin.site.index_title = 'Welcome to MedLearn AI'
+
+# Override the admin index view to use our custom dashboard
+def custom_admin_index(request, extra_context=None):
+    """Custom admin index that shows our dashboard while preserving admin functionality"""
+    return admin_dashboard(request)
+
+# Replace the default admin index view
+admin.site.index = custom_admin_index

@@ -7,15 +7,18 @@ from django.contrib.auth.models import User
 
 def nifti_file_path(instance, filename):
     """Generate file path for uploaded NIFTI files (ensuring .nii.gz)."""
-    base, ext = os.path.splitext(filename)
-    if ext.lower() not in ('.nii', '.gz'):
+    # Handle .nii.gz files properly
+    if filename.lower().endswith('.nii.gz'):
+        base = filename[:-7]  # Remove .nii.gz
         ext = '.nii.gz'
+    elif filename.lower().endswith('.nii'):
+        base = filename[:-4]  # Remove .nii
+        ext = '.nii'
     else:
-        # handle .nii.gz case
-        if filename.lower().endswith('.nii'):
-            ext = '.nii'
-        else:
-            ext = '.nii.gz'
+        # For any other extension, use base name and default to .nii.gz
+        base, _ = os.path.splitext(filename)
+        ext = '.nii.gz'
+    
     filename = f"{instance.id}_{base}{ext}"
     return os.path.join('uploads', filename)
 
