@@ -122,9 +122,8 @@ def admin_dashboard(request):
     avg_lung_volume = stats['avg_lung_volume'] or 0
     avg_lesion_count = stats['avg_lesion_count'] or 0
     
-    # Calculate success rate
-    processing_total = completed_tasks + failed_tasks
-    success_rate = (completed_tasks / processing_total * 100) if processing_total > 0 else 0
+    # Calculate completion rate (completed tasks / total tasks)
+    completion_rate = (completed_tasks / task_count * 100) if task_count > 0 else 0
     
     # OPTIMIZATION 2: Simplified time series data (last 7 days only for faster loading)
     tasks_over_time = list(SegmentationTask.objects
@@ -158,7 +157,7 @@ def admin_dashboard(request):
         # Simple dashboard data as requested
         'total_segmentations': task_count,
         'completed_segmentations': completed_tasks,
-        'completion_rate': round(success_rate, 1),
+        'completion_rate': round(completion_rate, 1),
         'segmentation_tasks': segmentation_tasks,
         
         # Keep existing context for backward compatibility
@@ -166,7 +165,7 @@ def admin_dashboard(request):
         'recent_tasks_count': recent_tasks_count,
         'completed_tasks': completed_tasks,
         'failed_tasks': failed_tasks,
-        'success_rate': round(success_rate, 1),
+        'success_rate': round(completion_rate, 1),
         'avg_tumor_volume': round(avg_tumor_volume, 2),
         'avg_lung_volume': round(avg_lung_volume, 2),
         'avg_lesion_count': round(avg_lesion_count, 1),
@@ -183,7 +182,7 @@ def admin_dashboard(request):
     print(f"=== DASHBOARD PERFORMANCE ===")
     print(f"Load time: {duration:.3f} seconds")
     print(f"Dashboard data: {task_count} tasks, {completed_tasks} completed, {failed_tasks} failed")
-    print(f"Success rate: {success_rate:.1f}%")
+    print(f"Completion rate: {completion_rate:.1f}%")
     print(f"History table: {len(segmentation_tasks)} recent tasks")
     print(f"=== END PERFORMANCE ===")
     

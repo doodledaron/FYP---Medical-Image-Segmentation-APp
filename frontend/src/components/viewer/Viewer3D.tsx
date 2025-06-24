@@ -149,10 +149,23 @@ export const Viewer3D: React.FC<Viewer3DProps> = ({
       
       // Add lung segmentation last to ensure it's properly aligned to the reference volume
       if (showLung && lungSegmentationUrl) {
+        // Determine lung opacity based on what other components are shown
+        let lungOpacity;
+        if (!showBody && !showTumour) {
+          // Only lung is shown
+          lungOpacity = 1.0;
+        } else if (showBody && showTumour) {
+          // All three components (body, lung, tumor) are shown - use very low opacity
+          lungOpacity = 0.02;
+        } else {
+          // Two components are shown - use moderate low opacity
+          lungOpacity = 0.06;
+        }
+        
         volumes.push({
           url: lungSegmentationUrl,
           colormap: 'copper',
-          opacity: (!showBody && !showTumour) ? 1.0 : 0.04,
+          opacity: lungOpacity,
           visible: true,
         });
       }
