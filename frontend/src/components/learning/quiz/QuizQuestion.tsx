@@ -80,5 +80,27 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
           })}
         </div>
       );
+
+    case 'true-false':
+      return (
+        <div className="space-y-4">
+          {question.options?.map((option, index) => (
+            <button
+              key={index}
+              onClick={() => onAnswer(option)}
+              className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${
+                currentAnswer === option
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-blue-100 hover:border-blue-300'
+              }`}
+            >
+              <span className="text-blue-900">{option}</span>
+            </button>
+          ))}
+        </div>
+      );
+
+    default:
+      return <div>Unsupported question type: {question.type}</div>;
   }
 };

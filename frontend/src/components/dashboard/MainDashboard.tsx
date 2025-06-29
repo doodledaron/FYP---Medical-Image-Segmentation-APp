@@ -250,7 +250,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-blue-800">Demo Version</h3>
                     <div className="mt-1 text-sm text-blue-700">
-                      <p>This is a demonstration version using pre-segmented data. For real-time AI segmentation, please contact us.</p>
+                      <p>This is a demonstration version using pre-segmented data. For real-time AI segmentation, please use the lab pc for now.</p>
                     </div>
                   </div>
                 </div>

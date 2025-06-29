@@ -28,8 +28,15 @@ export function ViewManager({ currentView, setCurrentView }: ViewManagerProps) {
   // Handle progress reset from ProgressPage
   useEffect(() => {
     const handleProgressReset = () => {
+      // Reset any active quiz session
+      quizManagement.resetQuiz();
+      // Refresh the tutorial data and trigger re-render
       quizManagement.refreshData();
+      // Refresh the progress page
       setProgressRefreshKey(prev => prev + 1);
+      // Re-fetch progress data and chart data
+      tutorialProgress.fetchProgress();
+      tutorialProgress.fetchChartData();
     };
     
     window.addEventListener('progress-reset', handleProgressReset);
@@ -37,7 +44,7 @@ export function ViewManager({ currentView, setCurrentView }: ViewManagerProps) {
     return () => {
       window.removeEventListener('progress-reset', handleProgressReset);
     };
-  }, [quizManagement]);
+  }, [quizManagement, tutorialProgress]);
 
   const handleQuizComplete = useCallback((score: number, totalPoints: number, answers: Record<string, string | string[]>) => {
     const { selectedTutorial } = quizManagement;

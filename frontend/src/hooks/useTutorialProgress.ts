@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-// Import the configured Axios instance
-import axiosInstance from '../api/axiosConfig'; // Corrected path
-
+import { fetchUserProgress, submitQuiz } from '../api/learning';
 import { UserProgress, QuizSubmission, QuizSubmissionResponse } from '../types'; // Import all from your types file
 
 // Define the chart data interface
@@ -26,18 +24,8 @@ export const useTutorialProgress = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get('/learning/progress/');
-      
-      // Map snake_case from backend to camelCase for frontend
-      const formattedProgress: UserProgress = {
-        completedTutorials: response.data.completed_tutorials || [],
-        totalPoints: response.data.total_points || 0,
-        completedCount: response.data.completed_count || 0,
-        completedByTopic: response.data.completed_by_topic || {},
-        lastActivity: response.data.last_activity
-      };
-      
-      setProgress(formattedProgress);
+      const progressData = await fetchUserProgress();
+      setProgress(progressData);
     } catch (err: any) {
       console.error("Failed to fetch progress:", err);
       setError(err.message || 'Failed to load progress data.');
@@ -51,14 +39,49 @@ export const useTutorialProgress = () => {
     fetchProgress();
   }, [fetchProgress]);
   
-  // Function to fetch chart data
+  // Function to fetch chart data based on actual user activity
   const fetchChartData = useCallback(async () => {
     setIsLoadingChartData(true);
     setChartError(null);
     try {
-      const response = await axiosInstance.get('/learning/chart-data/');
-      setChartData(response.data);
-      return response.data;
+      // Get quiz completion history from localStorage
+      const quizHistory = localStorage.getItem('quizHistory');
+      const completions = quizHistory ? JSON.parse(quizHistory) : [];
+      
+      // Generate chart data for the last 7 days
+      const chartData: ChartData = {
+        dates: [],
+        quiz_completions: [],
+        points_earned: []
+      };
+      
+      // Create array of last 7 days
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        chartData.dates.push(dateStr);
+        
+        // Count completions and points for this date
+        const dayCompletions = completions.filter((completion: any) => 
+          completion.completedAt?.split('T')[0] === dateStr
+        );
+        
+        // For quiz completions, only count first-time completions to avoid inflating numbers
+        const firstTimeCompletions = dayCompletions.filter((completion: any) => 
+          completion.isFirstCompletion !== false
+        );
+        
+        chartData.quiz_completions.push(firstTimeCompletions.length);
+        
+        // For points, sum all attempts (including retakes) to show total learning effort
+        chartData.points_earned.push(
+          dayCompletions.reduce((total: number, completion: any) => total + (completion.score || 0), 0)
+        );
+      }
+      
+      setChartData(chartData);
+      return chartData;
     } catch (err: any) {
       console.error("Failed to fetch chart data:", err);
       setChartError(err.message || 'Failed to load chart data.');
@@ -78,7 +101,9 @@ export const useTutorialProgress = () => {
     setIsResetting(true);
     setError(null);
     try {
-      const response = await axiosInstance.post('/learning/reset-progress/');
+      // Clear local storage progress data and quiz history
+      localStorage.removeItem('userProgress');
+      localStorage.removeItem('quizHistory');
       
       // Refetch the progress to update the UI
       await fetchProgress();
@@ -100,18 +125,13 @@ export const useTutorialProgress = () => {
   const submitQuizAnswers = useCallback(
     async (tutorialId: string, answers: QuizSubmission['answers']): Promise<QuizSubmissionResponse> => {
       try {
-        // Make sure we're sending the right data format
-        const payload = {
+        // Use the new frontend-only submit quiz function
+        const quizResult = await submitQuiz({
           tutorial_id: tutorialId,
           answers: answers
-        };
+        });
         
-        const response = await axiosInstance.post<QuizSubmissionResponse>(
-          '/learning/submit-quiz/',
-          payload
-        );
-        
-        // Small delay to ensure database updates are complete
+        // Small delay to ensure local storage updates are complete
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Fetch updated progress after quiz submission
@@ -120,13 +140,16 @@ export const useTutorialProgress = () => {
         // Also fetch updated chart data
         await fetchChartData();
         
-        return response.data;
+        // Return the result in the expected format
+        const response: QuizSubmissionResponse = {
+          message: 'Quiz submitted successfully',
+          score: quizResult.score,
+          total_points: quizResult.total_points
+        };
+        
+        return response;
       } catch (err: any) {
         console.error("Failed to submit quiz:", err);
-        if (err.response) {
-          console.error("Response data:", err.response.data);
-          console.error("Response status:", err.response.status);
-        }
         throw new Error(err.message || 'Failed to submit quiz.');
       }
     },
