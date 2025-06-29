@@ -1,0 +1,21 @@
+{
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {},
+  "regions": ["sin1"],
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
+} 

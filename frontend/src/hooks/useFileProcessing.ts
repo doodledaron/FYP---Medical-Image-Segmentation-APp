@@ -4,8 +4,8 @@ import { SegmentationResult } from "../types";
 import axios from "axios";
 import * as fs from 'fs';
 
-// Define API URL - you'll want to configure this based on your environment
-const API_URL = "http://localhost:8000/api/segmentation";
+// Define API URL - disabled for frontend-only deployment
+// const API_URL = "http://localhost:8000/api/segmentation";
 
 // Mock data paths for local testing
 const MOCK_DATA = {
@@ -216,6 +216,12 @@ export function useFileProcessing() {
   };
 
   const startAISegmentation = async (): Promise<void> => {
+    // For frontend-only deployment, redirect all AI segmentation requests to mock data
+    console.log("Frontend-only mode: Redirecting AI segmentation to mock data");
+    return startMockSegmentation();
+    
+    // Original backend code commented out for frontend-only deployment
+    /*
     if (!file) return;
     
     setLoading(true);
@@ -324,6 +330,7 @@ export function useFileProcessing() {
     } finally {
       setLoading(false);
     }
+    */
   };
 
   const completeManualSegmentation = (segData: any) => {

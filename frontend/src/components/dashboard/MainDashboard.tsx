@@ -112,7 +112,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   
   const [showManualSegmentationPreview, setShowManualSegmentationPreview] = useState(false);
   
-  // Active tab state for the upload section
+  // Active tab state for the upload section - default to 'mock' for demo-only
   const [activeUploadTab, setActiveUploadTab] = useState<'mock' | 'real'>('mock');
   
   // Toast notification state for mock segmentation
@@ -241,87 +241,49 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 </div>
               </div>
               
-              {/* Tabs Navigation */}
-              <div className="border-b border-gray-200 mb-6">
-                <div className="flex -mb-px">
-                  <button 
-                    onClick={() => setActiveUploadTab('mock')} 
-                    className={`py-3 px-4 font-medium text-base focus:outline-none ${
-                      activeUploadTab === 'mock' 
-                        ? 'border-b-2 border-blue-600 text-blue-600' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    Quick Demo (5-10s)
-                  </button>
-                  <button 
-                    onClick={() => setActiveUploadTab('real')} 
-                    className={`py-3 px-4 font-medium text-base focus:outline-none ${
-                      activeUploadTab === 'real' 
-                        ? 'border-b-2 border-blue-600 text-blue-600' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    Real Segmentation (5-10min)
-                  </button>
+              {/* Demo-Only Banner */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-6 border border-blue-200">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Eye className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">Demo Version</h3>
+                    <div className="mt-1 text-sm text-blue-700">
+                      <p>This is a demonstration version using pre-segmented data. For real-time AI segmentation, please contact us.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              {/* Mock Segmentation Tab Content */}
-              {activeUploadTab === 'mock' && (
-                <div className="py-2">
-                  <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0 mt-0.5">
-                        <Clock className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-blue-800">Quick Demo Mode</h3>
-                        <div className="mt-2 text-sm text-blue-700">
-                          <p>This mode loads a pre-segmented lung CT scan for immediate viewing without waiting for real-time processing.</p>
-                        </div>
+              {/* Simplified Single Option - No Tabs */}
+              <div className="py-2">
+                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-blue-800">Interactive Demo</h3>
+                      <div className="mt-2 text-sm text-blue-700">
+                        <p>Explore a pre-segmented lung CT scan with interactive 2D/3D visualization and educational content.</p>
                       </div>
                     </div>
                   </div>
-                  
-                  <button
-                    onClick={handleMockSegmentation}
-                    className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Brain className="h-5 w-5" />
-                    Load Pre-segmented Scan
-                  </button>
-                  
-                  <p className="text-xs text-gray-500 mt-3 text-center">
-                    Pre-loaded with lung and tumor segmentation for educational purposes
-                  </p>
                 </div>
-              )}
-              
-              {/* Real Segmentation Tab Content */}
-              {activeUploadTab === 'real' && (
-                <div className="py-2">
-                  <div className="bg-amber-50 rounded-lg p-4 mb-6">
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0 mt-0.5">
-                        <Clock className="h-5 w-5 text-amber-600" />
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-amber-800">Real Segmentation Mode</h3>
-                        <div className="mt-2 text-sm text-amber-700">
-                          <p>Upload your own NIFTI lung scan for processing with nnUNet. This process takes approximately 5-10 minutes.</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <FileUpload onFileSelect={handleFileSelect} />
-                  
-                  <p className="text-xs text-gray-500 mt-3 text-center">
-                    Upload a .nii.gz or .nii file to begin AI-powered analysis
-                  </p>
-                </div>
-              )}
+                
+                <button
+                  onClick={handleMockSegmentation}
+                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <Brain className="h-5 w-5" />
+                  Start Interactive Demo
+                </button>
+                
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  Pre-loaded with lung and tumor segmentation for educational purposes
+                </p>
+              </div>
             </div>
           </div>
         )}

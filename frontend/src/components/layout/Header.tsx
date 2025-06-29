@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain} from 'lucide-react';
+import { Brain, Eye } from 'lucide-react';
 import { UserProgress } from '../../types';
 
 interface HeaderProps {
@@ -21,7 +21,8 @@ export const Header: React.FC<HeaderProps> = ({
     },
     {
       key: 'tutorials',
-      label: 'Tutorials',
+      label: 'Quizzes',
+      // change the quizzes back to Tutorials if theres error
     },
     {
       key: 'progress',
@@ -43,8 +44,13 @@ export const Header: React.FC<HeaderProps> = ({
                 <Brain className="h-6 w-6" />
               </div>
               <h2 className="text-lg font-semibold tracking-tight text-gray-900">
-                MedLearn AI
+                MedLearn
               </h2>
+              {/* Demo Badge */}
+              <div className="ml-2 flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                <Eye className="h-3 w-3" />
+                <span>Demo</span>
+              </div>
             </div>
           </div>
           
