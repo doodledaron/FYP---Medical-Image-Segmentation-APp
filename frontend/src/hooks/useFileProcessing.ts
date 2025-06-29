@@ -15,7 +15,7 @@ const PUBLIC_CDN_BASE = "https://pub-a58de4b81e4a45a5b1a38f1ab6d33b2f.r2.dev";
 
 // Mock data paths - using public CDN for original, local for segmentations
 const MOCK_DATA = {
-  originalNiftiUrl: `${PUBLIC_CDN_BASE}/fyp2-lung-image`,
+  originalNiftiUrl: `${PUBLIC_CDN_BASE}/lung_001.nii.gz`,
   lungSegmentationUrl: "/mock_lung_segmentation.nii.gz", 
   tumorSegmentationUrl: "/mock_tumor_segmentation.nii.gz",
 };
