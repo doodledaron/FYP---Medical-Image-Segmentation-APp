@@ -45,15 +45,60 @@ export function ManualSegmentation({ file, onComplete, onCancel, directUrl }: Ma
         if (directUrl) {
           console.log("Loading NIFTI directly from URL:", directUrl);
           try {
-            const response = await fetch(directUrl);
+            // Use fetch with proper options to handle CORS and redirects
+            const response = await fetch(directUrl, {
+              method: 'GET',
+              mode: 'cors',
+              cache: 'no-cache',
+              headers: {
+                'Accept': 'application/octet-stream, application/gzip, */*',
+              }
+            });
+            
             if (!response.ok) {
               throw new Error(`Failed to fetch from URL: ${response.status} ${response.statusText}`);
             }
+            
+            // Check content type and size
+            const contentType = response.headers.get('content-type');
+            const contentLength = response.headers.get('content-length');
+            console.log("Response content-type:", contentType, "content-length:", contentLength);
+            
             buffer = await response.arrayBuffer();
             console.log("Successfully loaded from URL, size:", buffer.byteLength);
+            
+            // Validate buffer size - a proper NIFTI file should be much larger than 695 bytes
+            if (buffer.byteLength < 1024) {
+              console.warn("Buffer size seems too small for a NIFTI file:", buffer.byteLength);
+              // Check if this looks like an HTML response (error page)
+              const textDecoder = new TextDecoder();
+              const firstBytes = new Uint8Array(buffer.slice(0, Math.min(100, buffer.byteLength)));
+              const preview = textDecoder.decode(firstBytes);
+              console.log("Response preview:", preview);
+              if (preview.toLowerCase().includes('<html') || preview.toLowerCase().includes('<!doctype')) {
+                throw new Error("Received HTML response instead of NIFTI file. The CDN URL may be inaccessible or returning an error page.");
+              }
+            }
+            
           } catch (urlError: any) {
             console.error("Error loading from URL:", urlError);
-            throw new Error(`Failed to load from URL: ${urlError.message}`);
+            // Try a fallback approach - use axios like NiftiViewer does
+            console.log("Fetch failed, trying axios as fallback...");
+            try {
+              const axios = await import('axios');
+              const response = await axios.default.get(directUrl, { 
+                responseType: 'arraybuffer',
+                timeout: 30000,
+                headers: {
+                  'Accept': 'application/octet-stream, application/gzip, */*',
+                }
+              });
+              buffer = response.data;
+              console.log("Successfully loaded via axios, size:", buffer.byteLength);
+            } catch (axiosError) {
+              console.error("Axios fallback also failed:", axiosError);
+              throw new Error(`Failed to load from URL: ${urlError.message}. CDN may be inaccessible.`);
+            }
           }
         } else {
           console.log("Starting to load NIFTI file:", file.name, "size:", file.size);

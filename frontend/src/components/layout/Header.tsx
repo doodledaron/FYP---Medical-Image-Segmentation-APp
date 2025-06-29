@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between">
           {/* Logo and Title */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setCurrentView('dashboard')}>
               <div className="text-blue-500">
                 <Brain className="h-6 w-6" />
               </div>

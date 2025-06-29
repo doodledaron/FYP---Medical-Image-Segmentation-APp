@@ -99,7 +99,8 @@ export function ViewManager({ currentView, setCurrentView }: ViewManagerProps) {
     } = quizManagement;
     const { progress, isLoading: progressLoading, error: progressError, submitQuizAnswers } = tutorialProgress;
 
-    if (tutorialsLoading || progressLoading) {
+    // Don't show loading if we're in quiz mode (including summary) to prevent flash
+    if ((tutorialsLoading || progressLoading) && !showQuiz) {
       return <p className="text-center p-6 text-blue-600">Loading data...</p>;
     }
 

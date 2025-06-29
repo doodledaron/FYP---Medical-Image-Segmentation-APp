@@ -8,6 +8,7 @@ import { SegmentationChoiceModal } from '../common/SegmentationChoiceModal';
 import { ManualSegmentation } from '../viewer/ManualSegmentation';
 import axios from 'axios';
 import { ManualSegmentationViewer } from '../viewer/ManualSegmentationViewer';
+import { PUBLIC_CDN_BASE } from '../../hooks/useFileProcessing';
 
 interface MainDashboardProps {
   file: File | null;
@@ -214,7 +215,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           file={file}
           onComplete={handleCompleteManualSegmentation}
           onCancel={() => handleFileSelect(null as any)}
-          directUrl={isMockData ? '/mock_lung_scan.nii.gz' : undefined}
+          directUrl={isMockData ? `${PUBLIC_CDN_BASE}/lung_001.nii.gz` : undefined}
         />
       )}
 

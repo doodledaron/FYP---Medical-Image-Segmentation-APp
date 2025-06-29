@@ -10,7 +10,7 @@ import * as fs from 'fs';
 
 
 // Public CDN URL for reliable access without CORS issues
-const PUBLIC_CDN_BASE = "https://pub-a58de4b81e4a45a5b1a38f1ab6d33b2f.r2.dev";
+export const PUBLIC_CDN_BASE = "https://pub-a58de4b81e4a45a5b1a38f1ab6d33b2f.r2.dev";
 
 // Mock data paths - using public CDN for original, local for segmentations
 const MOCK_DATA = {
