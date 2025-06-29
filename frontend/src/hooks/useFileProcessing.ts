@@ -10,9 +10,12 @@ import * as fs from 'fs';
 // Cloud storage URLs for reliable access
 const CLOUD_STORAGE_BASE = "https://3e02a5a946d98b30c8bb5126f981e263.r2.cloudflarestorage.com";
 
-// Mock data paths - hybrid approach: cloud for original, local for segmentations
+// Public CDN URL for reliable access without CORS issues
+const PUBLIC_CDN_BASE = "https://pub-a58de4b81e4a45a5b1a38f1ab6d33b2f.r2.dev";
+
+// Mock data paths - using public CDN for original, local for segmentations
 const MOCK_DATA = {
-  originalNiftiUrl: `${CLOUD_STORAGE_BASE}/fyp2-lung-image`,
+  originalNiftiUrl: `${PUBLIC_CDN_BASE}/fyp2-lung-image`,
   lungSegmentationUrl: "/mock_lung_segmentation.nii.gz", 
   tumorSegmentationUrl: "/mock_tumor_segmentation.nii.gz",
 };
@@ -36,14 +39,14 @@ tBFS2bIRVX5/E31QH7//+Xp7cyrGkW57ChWinT0eRv4BAAD//ze+D6l9AwAA
 // Function to preload the mock file (call this at app startup)
 export async function preloadMockFile(): Promise<void> {
   try {
-    console.log("Preloading mock file from cloud storage...");
+    console.log("Preloading mock file from public CDN...");
     
-    // Fetch from cloud storage
+    // Fetch from public CDN
     try {
       const response = await fetch(MOCK_DATA.originalNiftiUrl);
       if (response.ok) {
         const blob = await response.blob();
-        console.log("Mock blob loaded from cloud storage, size:", blob.size);
+        console.log("Mock blob loaded from public CDN, size:", blob.size);
         
         if (blob.size > 0) {
           PRELOADED_MOCK_FILE = new File([blob], "mock_lung_scan.nii.gz", {
@@ -51,17 +54,17 @@ export async function preloadMockFile(): Promise<void> {
             lastModified: Date.now()
           });
           
-          console.log("Mock file successfully preloaded from cloud storage, size:", PRELOADED_MOCK_FILE.size);
+          console.log("Mock file successfully preloaded from public CDN, size:", PRELOADED_MOCK_FILE.size);
           return;
         }
       } else {
-        console.error(`Failed to fetch from cloud storage: ${response.status} ${response.statusText}`);
+        console.error(`Failed to fetch from public CDN: ${response.status} ${response.statusText}`);
       }
     } catch (fetchError) {
-      console.error("Failed to fetch from cloud storage:", fetchError);
+      console.error("Failed to fetch from public CDN:", fetchError);
     }
     
-    // If cloud storage fetch failed, use the base64 fallback
+    // If public CDN fetch failed, use the base64 fallback
     console.log("Using base64 fallback for mock file");
     try {
       // Convert base64 to binary
