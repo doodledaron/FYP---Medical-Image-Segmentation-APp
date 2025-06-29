@@ -7,8 +7,7 @@ import * as fs from 'fs';
 // Define API URL - disabled for frontend-only deployment
 // const API_URL = "http://localhost:8000/api/segmentation";
 
-// Cloud storage URLs for reliable access
-const CLOUD_STORAGE_BASE = "https://3e02a5a946d98b30c8bb5126f981e263.r2.cloudflarestorage.com";
+
 
 // Public CDN URL for reliable access without CORS issues
 const PUBLIC_CDN_BASE = "https://pub-a58de4b81e4a45a5b1a38f1ab6d33b2f.r2.dev";
@@ -16,8 +15,8 @@ const PUBLIC_CDN_BASE = "https://pub-a58de4b81e4a45a5b1a38f1ab6d33b2f.r2.dev";
 // Mock data paths - using public CDN for original, local for segmentations
 const MOCK_DATA = {
   originalNiftiUrl: `${PUBLIC_CDN_BASE}/lung_001.nii.gz`,
-  lungSegmentationUrl: "/mock_lung_segmentation.nii.gz", 
-  tumorSegmentationUrl: "/mock_tumor_segmentation.nii.gz",
+  lungSegmentationUrl: `${PUBLIC_CDN_BASE}/mock_lung_segmentation.nii.gz`, 
+  tumorSegmentationUrl: `${PUBLIC_CDN_BASE}/mock_tumor_segmentation.nii.gz`,
 };
 
 // Global preloaded mock file variable
