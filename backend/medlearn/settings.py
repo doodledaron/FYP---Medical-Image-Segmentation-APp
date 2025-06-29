@@ -231,8 +231,8 @@ os.makedirs(SEGMENTATION_RESULTS_PATH, exist_ok=True)
 
 # Unfold Admin Settings
 UNFOLD = {
-    "SITE_TITLE": "MedLearn AI",
-    "SITE_HEADER": "MedLearn AI Admin",
+    "SITE_TITLE": "MedLearn",
+    "SITE_HEADER": "MedLearnAdmin",
     "SITE_SYMBOL": "medical_services",  # Material icon name
     "SHOW_VIEW_ON_SITE": False,
     "SIDEBAR": {

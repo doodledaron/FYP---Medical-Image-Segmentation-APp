@@ -319,7 +319,7 @@ export const QuizComponent: React.FC<QuizComponentProps> = ({
             : 'opacity-0 -translate-x-10'
           : 'opacity-100 translate-x-0'
       }`}>
-        {/* Header with improved design */}
+        {/* Header with improved designss */}
         <div className="mb-10">
           <div className="flex items-center gap-4 mb-6">
             <div className="bg-gradient-to-r from-blue-100 to-indigo-100 p-3 rounded-xl">

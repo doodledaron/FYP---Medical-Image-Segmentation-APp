@@ -202,9 +202,9 @@ class SegmentationTaskAdmin(admin.ModelAdmin):
 admin.site.register(SegmentationTask, SegmentationTaskAdmin)
 
 # Configure the default admin site
-admin.site.site_header = 'MedLearn AI Administration'
-admin.site.site_title = 'MedLearn AI Admin'
-admin.site.index_title = 'Welcome to MedLearn AI'
+admin.site.site_header = 'MedLearnAdministration'
+admin.site.site_title = 'MedLearnAdmin'
+admin.site.index_title = 'Welcome to MedLearn'
 
 # Override the admin index view to use our custom dashboard
 def custom_admin_index(request, extra_context=None):

@@ -84,10 +84,48 @@ def sample_quiz_question(sample_tutorial):
         question="What is image segmentation?",
         type="multiple-choice",
         options=["Option A", "Option B", "Option C", "Option D"],
-        correct_answer=["Option A"],
+        correct_answer="Option A",
         explanation="Image segmentation divides an image into segments",
         points=10
     )
+
+@pytest.fixture
+def sample_tutorial_with_questions():
+    """Create a tutorial with multiple questions"""
+    tutorial = Tutorial.objects.create(
+        id="tut_with_q",
+        title="Comprehensive Quiz Tutorial",
+        thumbnail="https://example.com/thumb.jpg",
+        duration="15:00",
+        tutorial_type="practice",
+        topic="general",
+        description="Tutorial with multiple questions for testing"
+    )
+    
+    # Add multiple questions
+    QuizQuestion.objects.create(
+        id="q_001_mc",
+        tutorial=tutorial,
+        question="What is the primary purpose of image segmentation?",
+        type="multiple-choice",
+        options=["To enhance image quality", "To divide image into segments", "To compress images", "To add filters"],
+        correct_answer="To divide image into segments",
+        explanation="Image segmentation partitions an image into multiple segments",
+        points=10
+    )
+    
+    QuizQuestion.objects.create(
+        id="q_002_ms",
+        tutorial=tutorial,
+        question="Which are common segmentation techniques?",
+        type="multiple-select",
+        options=["Thresholding", "Region Growing", "Edge Detection", "Histogram Equalization"],
+        correct_answer=["Thresholding", "Region Growing", "Edge Detection"],
+        explanation="These are all valid segmentation methods",
+        points=15
+    )
+    
+    return tutorial
 
 @pytest.fixture
 def api_client():
