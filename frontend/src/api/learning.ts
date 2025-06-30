@@ -96,8 +96,11 @@ export const submitQuiz = async (submission: QuizSubmission): Promise<QuizResult
           lastActivity: null
         };
 
+        // Check if this is a first completion BEFORE updating progress
+        const isFirstCompletion = !progress.completedTutorials.includes(tutorial.id);
+
         // Add tutorial to completed if not already there
-        if (!progress.completedTutorials.includes(tutorial.id)) {
+        if (isFirstCompletion) {
           progress.completedTutorials.push(tutorial.id);
           progress.completedCount += 1;
           progress.totalPoints += score;
@@ -107,6 +110,9 @@ export const submitQuiz = async (submission: QuizSubmission): Promise<QuizResult
             progress.completedByTopic[tutorial.topic] = 0;
           }
           progress.completedByTopic[tutorial.topic] += 1;
+        } else {
+          // For retakes, still update the total points
+          progress.totalPoints += score;
         }
         
         progress.lastActivity = new Date().toISOString();
@@ -126,7 +132,7 @@ export const submitQuiz = async (submission: QuizSubmission): Promise<QuizResult
           totalPoints,
           completedAt: completionDate,
           answers: submission.answers,
-          isFirstCompletion: !progress.completedTutorials.includes(tutorial.id)
+          isFirstCompletion
         });
         localStorage.setItem('quizHistory', JSON.stringify(existingHistory));
 
